@@ -1,0 +1,20 @@
+version = 1
+
+[[annotations]]
+path = [
+".github/workflows/docs.yml",
+"docs/Makefile",
+"docs/zensical.yaml",
+"docs/mkdocs.yml",
+"docs/content/**/*.md",
+]
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 juFFTe contributors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "docs/content/api/ford/**/*"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 juFFTe contributors"
+SPDX-License-Identifier = "Apache-2.0"
+

@@ -1,0 +1,88 @@
+# Zensical Configuration for juFFTe
+# Note: Zensical is currently in early development (v0.0.x).
+# This configuration is compatible with both MkDocs Material and future Zensical.
+
+project:
+  name: juFFTe
+  description: Modern Fast Fourier Transform library in Fortran
+  version: 1.2.0
+  repository: https://github.com/FZJ-JSC/juFFTe/
+  license: Apache-2.0
+
+# Current build tool (MkDocs Material - Zensical compatible)
+build:
+  tool: mkdocs
+  config_file: mkdocs.yml
+  output_dir: site
+  
+# Future Zensical configuration (when stable)
+# zensical:
+#   config_file: zensical.yml
+#   output_dir: dist
+
+documentation:
+  source_dir: docs
+  index_file: index.md
+  
+  # Navigation structure (matches mkdocs.yml)
+  sections:
+    - name: Home
+      path: index.md
+    - name: Tutorials
+      path: tutorials/
+      items:
+        - Getting Started: getting-started.md
+    - name: API Reference
+      path: api/
+      items:
+        - Overview: index.md
+    - name: Examples
+      path: examples/
+      items:
+        - Simple 1D FFT: simple-1d-fft.md
+
+# Search configuration
+search:
+  enabled: true
+  language: en
+  indexing:
+    - content
+    - headings
+    - code_blocks
+
+# Deployment
+deployment:
+  # GitLab Pages (current)
+  gitlab_pages:
+    enabled: true
+    branch: gh-pages
+    
+  # GitHub Pages (alternative)
+  github_pages:
+    enabled: false
+    
+  # Zensical hosting (future)
+  zensical:
+    enabled: false
+    domain: juffte.zensical.io
+    cdn: true
+
+# Analytics (optional)
+analytics:
+  enabled: false
+  provider: google
+  tracking_id: UA-XXXXX-Y
+
+# Customization
+theme:
+  name: material
+  custom_dir: docs/overrides
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - search.highlight
+    - content.code.copy
+  
+  colors:
+    primary: blue
+    accent: blue

@@ -1,0 +1,25 @@
+# --------------------------------------------------------------------------------------------------
+# SPDX-FileCopyrightText: juFFTe developers
+# SPDX-License-Identifier: Apache-2.0
+# --------------------------------------------------------------------------------------------------
+
+name: REUSE compliance
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  reuse:
+    name: Check REUSE licensing
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Check REUSE compliance
+        uses: fsfe/reuse-action@v6

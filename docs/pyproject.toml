@@ -1,0 +1,23 @@
+# ------------------------------------------------------------------------------
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (C) 2025 Jayesh Badwaik <j.badwaik@fz-juelich.de>
+# ------------------------------------------------------------------------------
+[project]
+name = "seanerdocs"
+version = "2026.01"
+dependencies = [
+  "gitpython",
+  "pyyaml",
+  "pymdown-extensions",
+  "mkdocstrings[python]",
+  "mkdocs-material>=9.7.0", # for blog authors_profiles plugin
+  "mkdocs-gen-files",
+  "mkdocs-awesome-nav",
+  "mkdocs-awesome-pages-plugin",
+  "mkdocs-macros-plugin",
+  "mkdocs-pagetree-plugin",
+  "mkdocs-git-authors-plugin",
+  "mkdocs-git-revision-date-localized-plugin",
+  "mkdocs-mermaid2-plugin",
+]
+
