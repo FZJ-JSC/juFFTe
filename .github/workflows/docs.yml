@@ -5,7 +5,6 @@ on:
     branches: [ main, develop ]
     paths:
       - 'docs/**'
-      - 'mkdocs.yml'
       - 'README.md'
       - 'CONTRIBUTING.md'
   pull_request:
@@ -52,7 +51,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: documentation
-          path: site/
+          path: docs/site/
           retention-days: 7
 
       # Upload to Pages for deployment on main branch
@@ -60,29 +59,29 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site/
+          path: docs/site/
 
   # Deploy job - only runs on push to main
   deploy:
     # Only deploy from main branch
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    
+
     # Add a dependency to the build job
     needs: build
-    
+
     # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
     permissions:
       pages: write
       id-token: write
-    
+
     # Deploy to the github-pages environment
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    
+
     # Set runner OS to Linux
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
