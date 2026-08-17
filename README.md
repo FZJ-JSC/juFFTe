@@ -58,6 +58,7 @@ make WITHSPRL=1 WITHRVV=1
 | `zfft1d(a, n, juffte_x)`                | 1-D complex-to-complex FFT      |
 | `zfft1d_out(a, n, juffte_x, a_out)`     | 1-D complex-to-complex FFT      |
 | `zfft2d(a, nx, ny, juffte_x)`           | 2-D complex-to-complex FFT      |
+| `zfft2d_out(a, nx, ny, juffte_x, a_out)`| 2-D complex-to-complex FFT      |
 | `zfft3d(a, nx, ny, nz, juffte_x)`       | 3-D complex-to-complex FFT      |
 | `dzfft1d(a, a_c, n, juffte_x)`          | 1-D real-to-complex FFT         |
 | `zdfft1d(a_c, a, n, juffte_x)`          | 1-D complex-to-real FFT         |

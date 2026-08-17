@@ -38,7 +38,7 @@ endif
 FCFLAGS  += $(OMPFLAGS) 
 # -mprefer-vector-width=512
 
-all: test1d-fftwint test1d-out test1d test1dni test2d test3d rtest1d rtest2d rtest3d 
+all: test1d-fftwint test1d-out test1d test1dni test2d test2d-out test3d rtest1d rtest2d rtest3d 
 
 test1d-fftwint : test1d-fftwint.F90  test_utils_m.o
 	$(FC) $(FCFLAGS) $^ $(LIBFLAGS)  -o $@
@@ -53,6 +53,9 @@ test1d : test1d.F90  test_utils_m.o
 	$(FC) $(FCFLAGS) $^ $(LIBFLAGS)  -o $@
 
 test2d : test2d.F90 test_utils_m.o
+	$(FC) $(FCFLAGS) $^ $(LIBFLAGS) -o $@
+
+test2d-out : test2d-out.F90 test_utils_m.o
 	$(FC) $(FCFLAGS) $^ $(LIBFLAGS) -o $@
 
 test3d : test3d.F90 test_utils_m.o
