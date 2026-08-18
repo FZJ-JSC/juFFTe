@@ -21,17 +21,19 @@ make test
 
 ## Test Programs
 
-| **Program**    | **Description**                                      |
-| -------------- | ---------------------------------------------------- |
-| `test1d`       | 1D complex-to-complex FFT test                       |
-| `test1d-out`   | 1D out-of-place complex-to-complex FFT test          |
-| `test1dni`     | 1D in-place complex-to-complex FFT test              |
-| `test1d-fftwint` | 1D FFTW interface test                              |
-| `test2d`       | 2D complex-to-complex FFT test                       |
-| `test3d`       | 3D complex-to-complex FFT test                       |
-| `rtest1d`      | 1D real-to-complex FFT test                          |
-| `rtest2d`      | 2D real-to-complex FFT test                          |
-| `rtest3d`      | 3D real-to-complex FFT test                          |
+| **Program**      | **Description**                                      |
+| ---------------- | ---------------------------------------------------- |
+| `test1d`         | 1D complex-to-complex FFT test                       |
+| `test1d-out`     | 1D out-of-place complex-to-complex FFT test          |
+| `test1dni`       | 1D in-place complex-to-complex FFT test              |
+| `test1d-fftwint` | 1D FFTW interface test                               |
+| `test2d`         | 2D complex-to-complex FFT test                       |
+| `test2d-out`     | 2D out-of-place complex-to-complex FFT test          |
+| `test3d`         | 3D complex-to-complex FFT test                       |
+| `test3d-out`     | 3D out-of-place complex-to-complex FFT test          |
+| `rtest1d`        | 1D real-to-complex FFT test                          |
+| `rtest2d`        | 2D real-to-complex FFT test                          |
+| `rtest3d`        | 3D real-to-complex FFT test                          |
 
 ## Test Utilities
 
