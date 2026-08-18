@@ -34,17 +34,17 @@ subroutine zfft2d_64(a, nx, ny, iopt, out)
 
     implicit none
 
-    complex(real64), intent(inout) :: a(*)
-    complex(real64), optional, intent(out)   :: out(*)
-    integer, intent(in) :: nx, ny, iopt
-    complex(real64), save :: wx(NDA2), wy(NDA2), c(NDA2)
+    complex(real64), intent(inout)         :: a(*)
+    complex(real64), optional, intent(out) :: out(*)
+    integer, intent(in)                    :: nx, ny, iopt
+    complex(real64), save                  :: wx(NDA2), wy(NDA2), c(NDA2)
 #ifdef SPRL
-    integer, save :: lnx(16), lny(16)
+    integer, save                          :: lnx(16), lny(16)
 #else 
-    integer, save :: lnx(3), lny(3)
+    integer, save                          :: lnx(3), lny(3)
 #endif
-    real(real64) :: dn
-    integer :: i
+    real(real64)                           :: dn
+    integer                                :: i
 
 
     if (iopt == juffte_init) then
@@ -169,15 +169,15 @@ subroutine zfft2d_32(a, nx, ny, iopt, out)
 
     complex(real32), intent(inout)         :: a(*)
     complex(real32), optional, intent(out) :: out(*)
-    integer, intent(in) :: nx, ny, iopt
-    complex(real32) :: wx(NDA2), wy(NDA2),  c(NDA2)
+    integer, intent(in)                    :: nx, ny, iopt
+    complex(real32)                        :: wx(NDA2), wy(NDA2),  c(NDA2)
 #ifdef SPRL
-    integer, save :: lnx(16), lny(16)
+    integer, save                          :: lnx(16), lny(16)
 #else 
-    integer, save :: lnx(3), lny(3)
+    integer, save                          :: lnx(3), lny(3)
 #endif
-    real(real32) :: dn
-    integer :: i
+    real(real32)                           :: dn
+    integer                                :: i
 
 
     if (iopt == juffte_init) then
