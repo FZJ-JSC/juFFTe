@@ -53,18 +53,20 @@ make WITHSPRL=1 WITHRVV=1
 
 ### API Overview
 
-| **function**                            | **Description / Functionality** |
-| ----------------------------------      | --------------------------------|
-| `zfft1d(a, n, juffte_x)`                | 1-D complex-to-complex FFT      |
-| `zfft1d_out(a, n, juffte_x, a_out)`     | 1-D complex-to-complex FFT      |
-| `zfft2d(a, nx, ny, juffte_x)`           | 2-D complex-to-complex FFT      |
-| `zfft3d(a, nx, ny, nz, juffte_x)`       | 3-D complex-to-complex FFT      |
-| `dzfft1d(a, a_c, n, juffte_x)`          | 1-D real-to-complex FFT         |
-| `zdfft1d(a_c, a, n, juffte_x)`          | 1-D complex-to-real FFT         |
-| `dzfft2d(a, a_c, nx, ny, juffte_x)`     | 2-D real-to-complex FFT         |
-| `zdfft2d(a_c, a, nx, ny, juffte_x)`     | 2-D complex-to-real FFT         |
-| `dzfft3d(a, a_c, nx, ny, nz, juffte_x)` | 3-D real-to-complex FFT         |
-| `zdfft3d(a_c, a, nx, ny, nz, juffte_x)` | 3-D complex-to-real FFT         |
+| **function**                                | **Description / Functionality** |
+| --------------------------------------------| --------------------------------|
+| `zfft1d(a, n, juffte_x)`                    | 1-D complex-to-complex FFT      |
+| `zfft1d_out(a, n, juffte_x, a_out)`         | 1-D complex-to-complex FFT      |
+| `zfft2d(a, nx, ny, juffte_x)`               | 2-D complex-to-complex FFT      |
+| `zfft2d_out(a, nx, ny, juffte_x, a_out)`    | 2-D complex-to-complex FFT      |
+| `zfft3d(a, nx, ny, nz, juffte_x)`           | 3-D complex-to-complex FFT      |
+| `zfft3d_out(a, nx, ny, nz, juffte_x, a_out)`| 3-D complex-to-complex FFT      |
+| `dzfft1d(a, a_c, n, juffte_x)`              | 1-D real-to-complex FFT         |
+| `zdfft1d(a_c, a, n, juffte_x)`              | 1-D complex-to-real FFT         |
+| `dzfft2d(a, a_c, nx, ny, juffte_x)`         | 2-D real-to-complex FFT         |
+| `zdfft2d(a_c, a, nx, ny, juffte_x)`         | 2-D complex-to-real FFT         |
+| `dzfft3d(a, a_c, nx, ny, nz, juffte_x)`     | 3-D real-to-complex FFT         |
+| `zdfft3d(a_c, a, nx, ny, nz, juffte_x)`     | 3-D complex-to-real FFT         |
 
 - `juffte_x` can be `juffte_init` for initialization, `juffte_fw` for forward FFT, or `juffte_bw` for backward.
 - `_out` denotes the out-of-place transformation (output goes last).
