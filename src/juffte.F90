@@ -29,6 +29,7 @@ integer                  :: fftw_size = 0
 integer                  :: fftw_rank = 1
 integer                  :: fftw_nx   = 0
 integer                  :: fftw_ny   = 0
+integer                  :: fftw_nz   = 0
 
 interface dzfft1d
     module procedure :: dzfft1d_r64
@@ -93,6 +94,33 @@ if (juffte_initialized .eqv. .false. ) then
 
         end function fftw_plan_dft_2d
 
+    type(C_PTR) function fftw_plan_dft_3d(nx,ny,nz,input,output,sign,flags)
+        implicit none
+
+        integer(C_INT), value             :: nx, ny, nz
+        complex(real64), intent(inout)         :: input(:)
+        complex(real64), intent(inout)         :: output(:)
+        integer(C_INT), value, intent(in) :: sign
+        integer(C_INT), value, intent(in) :: flags
+
+        fftw_plan = flags
+        fftw_dir  = sign
+        fftw_nx   = nx
+        fftw_ny   = ny
+        fftw_nz   = nz
+        fftw_rank = 3
+
+        if (juffte_initialized .eqv. .false. ) then
+            if (same(input,output)) then
+                call zfft3d(input, fftw_nx, fftw_ny, fftw_nz, juffte_init)
+            else
+                call zfft3d(input, fftw_nx, fftw_ny, fftw_nz, juffte_init, output)
+                endif
+                juffte_initialized = .true.
+                endif
+
+        end function fftw_plan_dft_3d
+
     subroutine fftw_execute_dft(pln, input, output)
 
         implicit none
@@ -102,7 +130,13 @@ if (juffte_initialized .eqv. .false. ) then
         type(C_PTR) , intent(in)    :: pln
 
         ! fftw_plan=pln
-        if (fftw_rank == 2) then
+        if (fftw_rank == 3) then
+            if (same (input,output)) then
+                call zfft3d(input, fftw_nx, fftw_ny, fftw_nz, fftw_dir)
+            else
+                call zfft3d(input, fftw_nx, fftw_ny, fftw_nz, fftw_dir, output)
+            endif
+        elseif (fftw_rank == 2) then
             if (same (input,output)) then
                 call zfft2d(input, fftw_nx, fftw_ny, fftw_dir)
             else
@@ -128,6 +162,7 @@ if (juffte_initialized .eqv. .false. ) then
             fftw_size = 0
             fftw_nx   = 0
             fftw_ny   = 0
+            fftw_nz   = 0
             fftw_rank = 1
         end subroutine fftw_destroy_plan
 
@@ -218,6 +253,16 @@ if (juffte_initialized .eqv. .false. ) then
             call zfft3d(input, nx, ny, nz, iopt)
 
         end subroutine zfft3d_c
+    
+            subroutine zfft3d_out_c(input, output, nx, ny, nz, iopt) bind(C, name="zfft3d_out_c")
+            implicit none
+            integer(c_int), value, intent (in)       :: nx, ny, nz, iopt
+            complex(c_double_complex), intent (inout):: input(nx*ny*nz)
+            complex(c_double_complex), intent (out)  :: output(nx*ny*nz)
+
+            call zfft3d(input, nx, ny, nz, iopt, output)
+
+        end subroutine zfft3d_out_c
 
         subroutine dzfft1d_c(a, a_c, n, iopt) bind(C, name="dzfft1d_c")
             implicit none

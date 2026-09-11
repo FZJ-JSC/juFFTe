@@ -45,7 +45,7 @@ endif
 
 # -mprefer-vector-width=512
 CFLAGS  += $(OMPFLAGS) 
-all: test1d test2d test3d rtest1d rtest2d rtest3d fftw-test fftw-test2d
+all: test1d test2d test3d rtest1d rtest2d rtest3d fftw-test fftw-test2d fftw-test3d
 
 test1d : test1d.c  
 	$(CC) $(CFLAGS) $< $(LIBFLAGS)  -o $@
@@ -71,8 +71,11 @@ fftw-test : fftw-test.c
 fftw-test2d : fftw-test2d.c
 	$(CC) $(CFLAGS) -DFFTW $< $(LIBFLAGS) -o $@
 
-test  :   test1d test2d test3d rtest1d rtest2d rtest3d fftw-test fftw-test2d
-	./test1d 2 && ./test2d 2 2 && ./test3d 2 2 2 && ./rtest1d 2 && ./rtest2d 2 2 && ./rtest3d 2 2 2 && ./fftw-test 2 && ./fftw-test2d
+fftw-test3d : fftw-test3d.c
+	$(CC) $(CFLAGS) -DFFTW $< $(LIBFLAGS) -o $@
+
+test  :   test1d test2d test3d rtest1d rtest2d rtest3d fftw-test fftw-test2d fftw-test3d
+	./test1d 2 && ./test2d 2 2 && ./test3d 2 2 2 && ./rtest1d 2 && ./rtest2d 2 2 && ./rtest3d 2 2 2 && ./fftw-test 2 && ./fftw-test2d 2 2 && ./fftw-test3d 2 2 2
 
 clean:
-	rm -f test1d test1dni test2d test3d rtest1d rtest2d rtest3d fftw-test fftw-test2d *.o *.mod 
+	rm -f test1d test1dni test2d test3d rtest1d rtest2d rtest3d fftw-test fftw-test2d fftw-test3d *.o *.mod 

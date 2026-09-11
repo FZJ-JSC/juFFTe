@@ -41,11 +41,15 @@ endif
 FCFLAGS  += $(OMPFLAGS) 
 # -mprefer-vector-width=512
 
-all: test1d-fftwint test2d-fftwint test1d-out test1d test1dni test2d test2d-out test3d test3d-out rtest1d rtest2d rtest3d 
+all: test1d-fftwint test2d-fftwint test3d-fftwint test1d-out test1d test1dni test2d test2d-out test3d test3d-out rtest1d rtest2d rtest3d 
 
 test1d-fftwint : test1d-fftwint.F90  test_utils_m.o
 	$(FC) $(FCFLAGS) $^ $(LIBFLAGS) $(FFTWFLAGS)  -o $@
+
 test2d-fftwint : test2d-fftwint.F90  test_utils_m.o
+	$(FC) $(FCFLAGS) $^ $(LIBFLAGS) $(FFTWFLAGS)  -o $@
+
+test3d-fftwint : test3d-fftwint.F90  test_utils_m.o
 	$(FC) $(FCFLAGS) $^ $(LIBFLAGS) $(FFTWFLAGS)  -o $@
 
 test1d-out : test1d-out.F90 test_utils_m.o 
@@ -81,8 +85,8 @@ rtest3d : rtest3d.F90 test_utils_m.o
 test_utils_m.o : test_utils_m.F90 
 	$(FC) -c $(FCFLAGS) $(FCFLAGS1) $< 
 
-test  :   test1d test1d-out test1dni test1d-fftwint test2d-fftwint test2d test3d rtest1d rtest2d rtest3d
-	./test1d 2 && ./test1d-out 2 && ./test1dni 2 &&  ./test2d 2 2  && ./test3d 2 2 2 && ./rtest1d 2 &&./rtest2d 2 2 && ./rtest3d 2 2 2 && ./test1d-fftwint 2 ./test2d-fftwint 2 2 
+test  :   test1d test1d-out test1dni test1d-fftwint test2d-fftwint test3d-fftwint test2d test3d rtest1d rtest2d rtest3d
+	./test1d 2 && ./test1d-out 2 && ./test1dni 2 &&  ./test2d 2 2  && ./test3d 2 2 2 && ./rtest1d 2 &&./rtest2d 2 2 && ./rtest3d 2 2 2 && ./test1d-fftwint 2 ./test2d-fftwint 2 2 ./test3d-fftwint 2 2 2
 
 clean:
-	rm -f test1d test1d-out test2d-out test3d-out test1d-fftwint test1dni test2d test3d rtest1d rtest2d rtest3d *.o *.mod 
+	rm -f test1d test1d-out test2d-out test3d-out test1d-fftwint test2d-fftwint test3d-fftwint test1dni test2d test3d rtest1d rtest2d rtest3d *.o *.mod 
