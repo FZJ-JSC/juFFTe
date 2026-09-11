@@ -29,7 +29,8 @@ make test
 | `rtest1d`      | 1D real-to-complex FFT test                          |
 | `rtest2d`      | 2D real-to-complex FFT test                          |
 | `rtest3d`      | 3D real-to-complex FFT test                          |
-| `fftw-test`    | FFTW interface compatibility test                    |
+| `fftw-test`    | FFTW interface compatibility test (1D)               |
+| `fftw-test2d`  | FFTW interface compatibility test (2D)               |
 
 ## Cleaning
 
@@ -37,3 +38,10 @@ To clean build artifacts:
 ```
 make clean
 ```
+## From FFTW to juFFTe
+
+to use juFFTe instead of fftw:
+
+1. Replace `#include <fftw3.h>` with `#include <juffte.h>`.
+2. Add `-DFFTW` and  `-ljuffte -lm -lgfortran` to your compilation/linking flags.
+3. Recompile.

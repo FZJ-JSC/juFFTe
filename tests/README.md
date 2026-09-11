@@ -45,3 +45,11 @@ To clean build artifacts:
 ```
 make clean
 ```
+
+## From FFTW to juFFTe
+
+to use juFFTe instead of fftw:
+
+1. Replace `include 'fftw3.f03'` with `use juffte`.
+2. Replace `-lfftw3` with  `-ljuffte` in your Makefile.
+3. Recompile.

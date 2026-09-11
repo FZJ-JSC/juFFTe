@@ -4,13 +4,33 @@
 // --------------------------------------------------------------------------------------------------
 
 #include <stdio.h>
-//#include <fftw3.h>
+#include <stdlib.h>
+#ifdef WITHFFTW
+#include <fftw3.h>
+#endif
+#ifndef WITHFFTW
 #include <juffte.h>
+#endif
 
-int main(void)
+int main(int argc, char **argv)
 {
     printf("FFTW interface test\n");
-    int i, n = 2;
+    int n;
+    if (argc < 2)
+    {
+        printf("n = ");
+        if (scanf("%d", &n) != 1 || n <= 0)
+        {
+            fprintf(stderr, "Invalid input for n.\n");
+            return 1;
+        }
+    }
+    else
+    {
+        n = atoi(argv[1]);
+    }
+
+    int i;
     fftw_complex *in, *out;
     fftw_plan plan;
 
@@ -21,7 +41,7 @@ int main(void)
     /* Initialize input data (a simple ramp) */
     for (i = 0; i < n; i++) {
         in[i][0] = (double)(i + 1);  /* real part */
-        in[i][1] = 0.0;              /* imag part */
+        in[i][1] = n - (double)(i );  /* imag part */
     }
 
     printf("Input data:\n");
