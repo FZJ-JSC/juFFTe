@@ -200,6 +200,16 @@ if (juffte_initialized .eqv. .false. ) then
 
         end subroutine zfft2d_c
 
+        subroutine zfft2d_out_c(input, output, nx, ny, iopt) bind(C, name="zfft2d_out_c")
+            implicit none
+            integer(c_int), value, intent (in)       :: nx, ny, iopt
+            complex(c_double_complex), intent (inout):: input(nx*ny)
+            complex(c_double_complex), intent (out)  :: output(nx*ny)
+
+            call zfft2d(input, nx, ny, iopt, output)
+
+        end subroutine zfft2d_out_c
+
         subroutine zfft3d_c(input, nx, ny, nz, iopt) bind(C, name="zfft3d_c")
             implicit none
             integer(c_int), value, intent (in)       :: nx, ny, nz, iopt

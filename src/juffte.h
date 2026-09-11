@@ -28,6 +28,7 @@ typedef double fftw_complex[2];
 void zfft1d_c(CLXTYP *input, int n, int iopt);
 void zfft1d_out_c(CLXTYP *input, CLXTYP *output, int n, int iopt);
 void zfft2d_c(CLXTYP *input, int nx, int ny, int iopt);
+void zfft2d_out_c(CLXTYP *input, CLXTYP *output, int nx, int ny, int iopt);
 void zfft3d_c(CLXTYP *input, int nx, int ny, int nz, int iopt);
 void dzfft1d_c(double *a, CLXTYP *a_c, int n, int iopt);
 void dzfft2d_c(double *a, CLXTYP *a_c, int nx, int ny, int iopt);
@@ -53,7 +54,9 @@ int FFTW_EXHAUSTIVE = 3;
 
 typedef struct
 {
-    int n;           // length of transform
+    int n;           // length of transform (nx*ny for a 2D plan)
+    int rank;        // 1 or 2
+    int nx, ny;      // per-dimension sizes (2D plans only)
     int dir;
     int flag;
     // Buffers (only some are used depending on type)
@@ -83,6 +86,7 @@ fftw_plan fftw_plan_dft_1d(int n, fftw_complex *in, fftw_complex *out, int dir, 
 {
     fftw_plan p;
     p.n = n;
+    p.rank = 1;
     p.c_in = in;
     p.c_out = out;
     p.dir = dir;
@@ -96,7 +100,31 @@ fftw_plan fftw_plan_dft_1d(int n, fftw_complex *in, fftw_complex *out, int dir, 
         {
             zfft1d_out_c(p.c_in, p.c_out, p.n, 0);
         }
-    
+
+    return p;
+}
+
+fftw_plan fftw_plan_dft_2d(int nx, int ny, fftw_complex *in, fftw_complex *out, int dir, int flag)
+{
+    fftw_plan p;
+    p.n = nx * ny;
+    p.rank = 2;
+    p.nx = nx;
+    p.ny = ny;
+    p.c_in = in;
+    p.c_out = out;
+    p.dir = dir;
+    p.flag = flag;
+
+    if (p.c_in == p.c_out)
+        {
+            zfft2d_c(p.c_in, p.nx, p.ny, 0);
+        }
+    else
+        {
+            zfft2d_out_c(p.c_in, p.c_out, p.nx, p.ny, 0);
+        }
+
     return p;
 }
 
@@ -119,15 +147,28 @@ void fft_plan_print(fftw_plan p) // for debug
 
 void fftw_execute(fftw_plan p) // for debug
 {
-
-    if(p.c_in == p.c_out)    
+    if (p.rank == 2)
     {
-        zfft1d_c(p.c_in, p.n, p.dir);
+        if (p.c_in == p.c_out)
+        {
+            zfft2d_c(p.c_in, p.nx, p.ny, p.dir);
+        }
+        else
+        {
+            zfft2d_out_c(p.c_in, p.c_out, p.nx, p.ny, p.dir);
+        }
     }
     else
     {
-        zfft1d_out_c(p.c_in, p.c_out, p.n, p.dir);
-    }     
+        if(p.c_in == p.c_out)
+        {
+            zfft1d_c(p.c_in, p.n, p.dir);
+        }
+        else
+        {
+            zfft1d_out_c(p.c_in, p.c_out, p.n, p.dir);
+        }
+    }
 }
 #endif
 
