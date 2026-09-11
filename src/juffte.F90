@@ -23,9 +23,12 @@ implicit none
 logical                  :: juffte_initialized = .false. 
 
 ! FFTW interface
-integer                  :: fftw_plan       = 0
-integer                  :: fftw_dir = 0
-integer                  :: fftw_size       = 0   
+integer                  :: fftw_plan = 0
+integer                  :: fftw_dir  = 0
+integer                  :: fftw_size = 0
+integer                  :: fftw_rank = 1
+integer                  :: fftw_nx   = 0
+integer                  :: fftw_ny   = 0
 
 interface dzfft1d
     module procedure :: dzfft1d_r64
@@ -51,17 +54,44 @@ type(C_PTR) function fftw_plan_dft_1d(n,input,output,sign,flags)
 fftw_plan = flags
 fftw_dir  = sign
 fftw_size = n
+fftw_rank = 1
 
 if (juffte_initialized .eqv. .false. ) then
     if (same(input,output)) then
         call zfft1d(input, fftw_size, juffte_init)
-    else    
+    else
         call zfft1d(input, fftw_size, juffte_init, output)
         endif
         juffte_initialized = .true.
         endif
 
     end function fftw_plan_dft_1d
+
+    type(C_PTR) function fftw_plan_dft_2d(nx,ny,input,output,sign,flags)
+        implicit none
+
+        integer(C_INT), value             :: nx, ny
+        complex(real64), intent(inout)         :: input(:)
+        complex(real64), intent(inout)         :: output(:)
+        integer(C_INT), value, intent(in) :: sign
+        integer(C_INT), value, intent(in) :: flags
+
+        fftw_plan = flags
+        fftw_dir  = sign
+        fftw_nx   = nx
+        fftw_ny   = ny
+        fftw_rank = 2
+
+        if (juffte_initialized .eqv. .false. ) then
+            if (same(input,output)) then
+                call zfft2d(input, fftw_nx, fftw_ny, juffte_init)
+            else
+                call zfft2d(input, fftw_nx, fftw_ny, juffte_init, output)
+                endif
+                juffte_initialized = .true.
+                endif
+
+        end function fftw_plan_dft_2d
 
     subroutine fftw_execute_dft(pln, input, output)
 
@@ -72,11 +102,19 @@ if (juffte_initialized .eqv. .false. ) then
         type(C_PTR) , intent(in)    :: pln
 
         ! fftw_plan=pln
-        fftw_size = size(input)
-        if (same (input,output)) then
-            call zfft1d(input, fftw_size, fftw_dir)
+        if (fftw_rank == 2) then
+            if (same (input,output)) then
+                call zfft2d(input, fftw_nx, fftw_ny, fftw_dir)
+            else
+                call zfft2d(input, fftw_nx, fftw_ny, fftw_dir, output)
+                endif
         else
-            call zfft1d(input, fftw_size, fftw_dir, output)
+            fftw_size = size(input)
+            if (same (input,output)) then
+                call zfft1d(input, fftw_size, fftw_dir)
+            else
+                call zfft1d(input, fftw_size, fftw_dir, output)
+                endif
             endif
         end subroutine fftw_execute_dft
 
@@ -87,7 +125,10 @@ if (juffte_initialized .eqv. .false. ) then
             type(C_PTR), intent(in)         :: pln
 
             fftw_plan = 0
-            fftw_size = 0 
+            fftw_size = 0
+            fftw_nx   = 0
+            fftw_ny   = 0
+            fftw_rank = 1
         end subroutine fftw_destroy_plan
 
 
