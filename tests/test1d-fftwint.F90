@@ -5,10 +5,16 @@
 
 program test1d
     use, intrinsic :: iso_c_binding
+    use, intrinsic :: iso_fortran_env
+#ifndef FFTW
     use juffte
+#endif
     use test_utils_m
+
     implicit none
-    
+#ifdef FFTW
+      include 'fftw3.f03'
+#endif  
     complex(real64),allocatable    :: a(:), a_out(:)
     integer                   :: N, num_args
     complex(real64)                :: a_in
@@ -26,7 +32,7 @@ program test1d
         read(args, "(I10)") n
     end if
 
-    allocate(a(n), a_out(n),)
+    allocate(a(n), a_out(n))
     call init(a, n)
     print*, "before FFT a"
     call dump(a, n)
@@ -34,13 +40,17 @@ program test1d
     a_in = a(n)
     plan = fftw_plan_dft_1d(N, a, a_out, FFTW_FORWARD, FFTW_ESTIMATE)
    call fftw_execute_dft(plan, a, a_out)
+    call fftw_destroy_plan(plan)
     print*, "after forward a_out"  
     call dump(a_out, n)
-    plan = fftw_plan_dft_1d( N, a, a_out, FFTW_BACKWARD, FFTW_ESTIMATE)
+    plan = fftw_plan_dft_1d( N, a_out, a, FFTW_BACKWARD, FFTW_ESTIMATE)
    call fftw_execute_dft(plan, a_out, a)
+#ifdef FFTW
+    a = a/N
+#endif
     print*, "after backrward a"
     call dump(a, n)
-    !call dfftw_destroy_plan(plan)
+    call fftw_destroy_plan(plan)
     call getarg(0, args)
     read(args, "(A20)") exe
 

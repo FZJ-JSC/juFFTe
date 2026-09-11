@@ -4,7 +4,7 @@
 # --------------------------------------------------------------------------------------------------
 
 FC = gfortran
-
+WITHFFTW  ?= 0 
 FCFLAGS = -g -O3
 # -g -O3 -ftree-vectorize -fopt-info-vec -mavx512f -fopt-info-vec-missed
 # -fno-tree-vectorize -fno-openmp-simd  # disable vectorization
@@ -15,7 +15,10 @@ LIBFLAGS = -L $(LIBDIR)  -I $(INCDIR) -ljuffte
 ifeq ($(WITHSPRL), 1)
     LIBFLAGS = -L $(LIBDIR) -I $(INCDIR) -ljufftesp
 endif
-
+ifeq ($(WITHFFTW), 1)
+	FFTWINC ?= /usr/include
+	FFTWFLAGS = -I $(FFTWINC) -lfftw3 -DFFTW
+endif
 
 OMPFLAGS = -fopenmp
  
@@ -41,7 +44,7 @@ FCFLAGS  += $(OMPFLAGS)
 all: test1d-fftwint test1d-out test1d test1dni test2d test2d-out test3d test3d-out rtest1d rtest2d rtest3d 
 
 test1d-fftwint : test1d-fftwint.F90  test_utils_m.o
-	$(FC) $(FCFLAGS) $^ $(LIBFLAGS)  -o $@
+	$(FC) $(FCFLAGS) $^ $(LIBFLAGS) $(FFTWFLAGS)  -o $@
 
 test1d-out : test1d-out.F90 test_utils_m.o 
 	$(FC) $(FCFLAGS) $^ $(LIBFLAGS)  -o $@
