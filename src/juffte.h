@@ -6,6 +6,7 @@
 #ifndef JUFFTE_H
 #define JUFFTE_H
 #define FFTW_ALIGNMENT 32
+#include <stdio.h>
 #include <stdlib.h>
 #ifdef __cplusplus
 extern "C" {
@@ -14,8 +15,8 @@ extern "C" {
 #include <complex.h>
 
 int juffte_init =0;
-int juffte_fw = 1;
-int juffte_bw = -1;
+int juffte_fw = -1;
+int juffte_bw = 1;
 
 
 #ifdef FFTW
