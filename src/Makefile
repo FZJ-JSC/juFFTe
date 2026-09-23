@@ -10,7 +10,7 @@ LIBS = libjuffte.a
 
 
 CC ?= gcc 
-FC ?= gfortran
+FC = gfortran
 FCFLAGS = -g -O3 
 CFLAGS  = -g -O3 
 # -fno-tree-vectorize -fno-openmp-simd # disable vectorization

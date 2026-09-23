@@ -48,7 +48,10 @@ subroutine zfft2d_64(a, nx, ny, iopt, out)
 
 
     if (iopt == juffte_init) then
+! b is THREADPRIVATE: every thread needs its own allocation.
+!$OMP PARALLEL
     allocate (b((NDA2 + NP)*NBLK))
+!$OMP END PARALLEL
 #ifdef SPRL
     call factor2(nx,lnx)
     call factor2(ny,lny)
@@ -181,7 +184,10 @@ subroutine zfft2d_32(a, nx, ny, iopt, out)
 
 
     if (iopt == juffte_init) then
+! b_r32 is THREADPRIVATE: every thread needs its own allocation.
+!$OMP PARALLEL
        allocate (b_r32((NDA2 + NP)*NBLK))
+!$OMP END PARALLEL
 #ifdef SPRL
     call factor2(nx,lnx)
     call factor2(ny,lny)
