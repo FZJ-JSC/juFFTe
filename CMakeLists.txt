@@ -4,7 +4,9 @@
 # --------------------------------------------------------------------------------------------------
 
 cmake_minimum_required(VERSION 3.15)
-project(JUFFTE LANGUAGES C CXX Fortran)
+project(JUFFTE LANGUAGES C Fortran)
+
+include(GNUInstallDirs)
 
 # =========================
 # Options
@@ -28,10 +30,28 @@ if(WITHRVV AND NOT WITHSPRL)
     set(WITHSPRL ON)
 endif()
 
+# FFTW is optional, used only by the benchmark comparison. No FindFFTW module exists.
 if(WITHFFTW)
-    find_package(FFTW)
-    if(FFTW_FOUND)
-        message(STATUS "FFTW found: enabling FFTW support")
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(FFTW IMPORTED_TARGET fftw3)
+    else()
+        message(WARNING "pkg-config not found; cannot locate FFTW.")
+    endif()
+
+    # fftw3_omp ships without a .pc file on most distros.
+    find_library(FFTW_OMP_LIBRARY
+        NAMES fftw3_omp fftw3_threads
+        HINTS ${FFTW_LIBRARY_DIRS} ${FFTW_LIBDIR}
+    )
+
+    if(FFTW_FOUND AND FFTW_OMP_LIBRARY)
+        message(STATUS "FFTW found (${FFTW_VERSION}): enabling FFTW support")
+        message(STATUS "FFTW threading library: ${FFTW_OMP_LIBRARY}")
+    elseif(FFTW_FOUND)
+        message(WARNING "FFTW found but neither fftw3_omp nor fftw3_threads was; "
+                        "FFTW support will be disabled.")
+        set(WITHFFTW OFF)
     else()
         message(WARNING "FFTW not found. FFTW support will be disabled.")
         set(WITHFFTW OFF)
@@ -60,7 +80,18 @@ set(CMAKE_C_FLAGS_RELEASE "-O3 -g")
 # =========================
 # Detect architecture and CPU features
 # =========================
-string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" ARCH)
+# ARCH may be set on the command line; a vector backend pins it to its own ISA.
+set(ARCH "" CACHE STRING "Target architecture (default: CMAKE_SYSTEM_PROCESSOR)")
+
+if(WITHRVV)
+    set(ARCH "riscv64")
+elseif(WITHSVE)
+    set(ARCH "aarch64")
+elseif(NOT ARCH)
+    set(ARCH "${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+
+string(TOLOWER "${ARCH}" ARCH)
 
 if(ARCH MATCHES "x86_64|amd64")
   set(IS_X86 TRUE)
@@ -70,22 +101,19 @@ elseif(ARCH MATCHES "riscv64")
   set(IS_RISCV TRUE)
 endif()
 
-message(STATUS "Detected architecture: ${ARCH}")
+message(STATUS "Target architecture: ${ARCH}")
 
-# Enable OpenMP if available
-find_package(OpenMP)
-if(OpenMP_Fortran_FOUND)
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${OpenMP_Fortran_FLAGS}")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-    message(STATUS "OpenMP found: enabling parallel builds")
+# Static executables cannot link .so files (e.g. libgomp.so); prefer archives.
+if(CMAKE_EXE_LINKER_FLAGS MATCHES "-static")
+    list(INSERT CMAKE_FIND_LIBRARY_SUFFIXES 0 ".a")
 endif()
+
+find_package(OpenMP)
 
 # =========================
 # Detect compiler-specific flags
 # =========================
-if(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -qopenmp")
-elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Flang")
+if(CMAKE_Fortran_COMPILER_ID MATCHES "Flang")
     set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -Wno-ignored-directive -ffast-math -mepi")
 elseif(CMAKE_Fortran_COMPILER_ID MATCHES "NVHPC")
     # Placeholder: add NVIDIA Fortran flags if needed
@@ -95,257 +123,229 @@ endif()
 # Source lists
 # =========================
 set(OBJ_COMMON
-    ${CMAKE_SOURCE_DIR}/src/param.F90
-    ${CMAKE_SOURCE_DIR}/src/utils_m.F90
-    ${CMAKE_SOURCE_DIR}/src/factor_m.F90
-    ${CMAKE_SOURCE_DIR}/src/kernel_m.F90
-    ${CMAKE_SOURCE_DIR}/src/fft235_m.F90
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/param.F90
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils_m.F90
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/factor_m.F90
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/kernel_m.F90
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/fft235_m.F90
 )
 
-set(OBJ_STD
-    ${OBJ_COMMON}
-    ${CMAKE_SOURCE_DIR}/src/zfft1d_m.F90
-    ${CMAKE_SOURCE_DIR}/src/zfft2d_m.F90
-    ${CMAKE_SOURCE_DIR}/src/zfft3d_m.F90
-    ${CMAKE_SOURCE_DIR}/src/dzfft2d_m.F90
-    ${CMAKE_SOURCE_DIR}/src/zdfft2d_m.F90
-    ${CMAKE_SOURCE_DIR}/src/dzfft3d_m.F90
-    ${CMAKE_SOURCE_DIR}/src/zdfft3d_m.F90
-    ${CMAKE_SOURCE_DIR}/src/juffte.F90
+set(OBJ_TRANSFORMS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/zfft1d_m.F90
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/zfft2d_m.F90
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/zfft3d_m.F90
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/dzfft2d_m.F90
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/zdfft2d_m.F90
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/dzfft3d_m.F90
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/zdfft3d_m.F90
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/juffte.F90
 )
 
-set(OBJ_SPRL
-    ${OBJ_COMMON}
-    ${CMAKE_SOURCE_DIR}/src/fft235s_m.F90
-    ${CMAKE_SOURCE_DIR}/src/zfft1d_m.F90
-    ${CMAKE_SOURCE_DIR}/src/zfft2d_m.F90
-    ${CMAKE_SOURCE_DIR}/src/zfft3d_m.F90
-    ${CMAKE_SOURCE_DIR}/src/dzfft2d_m.F90
-    ${CMAKE_SOURCE_DIR}/src/zdfft2d_m.F90
-    ${CMAKE_SOURCE_DIR}/src/dzfft3d_m.F90
-    ${CMAKE_SOURCE_DIR}/src/zdfft3d_m.F90
-    ${CMAKE_SOURCE_DIR}/src/juffte.F90
-)
+set(OBJ_STD  ${OBJ_COMMON} ${OBJ_TRANSFORMS})
+set(OBJ_SPRL ${OBJ_COMMON} ${CMAKE_CURRENT_SOURCE_DIR}/src/fft235s_m.F90 ${OBJ_TRANSFORMS})
 
 # =========================
 # Conditional logic for SPIRAL / SVE / RVV
 # =========================
 if(WITHSPRL)
     add_definitions(-DSPRL)
-    set(SPRL_PATH "${CMAKE_SOURCE_DIR}/src/spiral/c")
-    file(GLOB SPRL_C_SOURCES "${SPRL_PATH}/*.c")
-    
-    if(BUILD_SHARED_LIBS)
-        add_library(jufftesp_shared SHARED ${OBJ_SPRL} ${SPRL_C_SOURCES})
-        target_include_directories(jufftesp_shared PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-        target_link_libraries(jufftesp_shared PUBLIC m)
-        set_target_properties(jufftesp_shared PROPERTIES OUTPUT_NAME jufftesp)
-    else()
-        add_library(jufftesp STATIC ${OBJ_SPRL} ${SPRL_C_SOURCES})
-        target_include_directories(jufftesp PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-    endif()
-    message(STATUS "Enabling Spiral backend")
-    
+
+    # TODO: only the RVV kernels are in the tree.
     if(WITHSVE)
-        set(SPRL_PATH "${CMAKE_SOURCE_DIR}/src/spiral/sve")
-        file(GLOB SPRL_C_SOURCES "${SPRL_PATH}/*.c")
-        message(STATUS "Enabling SVE backend")
-        if (CMAKE_C_COMPILER_ID STREQUAL "GNU" AND CMAKE_FORTRAN_COMPILER_ID STREQUAL "GNU")
-            add_compile_options(-march=armv8.2-a+sve)
-        endif()
+        message(FATAL_ERROR "TODO: the SVE Spiral backend is not implemented yet. Use -DWITHRVV=ON.")
+    elseif(NOT WITHRVV)
+        message(FATAL_ERROR "TODO: the generic C Spiral backend is not implemented yet. Use -DWITHRVV=ON.")
+    endif()
+
+    # Resolve the variant BEFORE add_library(): it captures the source list, and
+    # directory-level options only reach targets created afterwards.
+    if(WITHSVE)
+        set(SPRL_VARIANT   "sve")
+        set(SPRL_PATH      "${CMAKE_CURRENT_SOURCE_DIR}/src/spiral/sve")
+        set(SPRL_ARCH_FLAG "-march=armv8.2-a+sve")
     elseif(WITHRVV)
-        set(SPRL_PATH "${CMAKE_SOURCE_DIR}/src/spiral/rvv")
-        file(GLOB SPRL_C_SOURCES "${SPRL_PATH}/*.c")
-        message(STATUS "Enabling RVV backend")
-        if (CMAKE_C_COMPILER_ID STREQUAL "GNU" AND CMAKE_FORTRAN_COMPILER_ID STREQUAL "GNU")
-            add_compile_options(-march=rv64gcv)
-        endif()
-    endif()
-
-    if(WITHSPRL)
-        if(WITHSVE)
-            if(NOT EXISTS "${CMAKE_SOURCE_DIR}/src/spiral/sve/dft2sve_a.c")
-                message(FATAL_ERROR "No spiral file found for architecture (sve)")
-            endif()
-        elseif(WITHRVV)
-            if(NOT EXISTS "${CMAKE_SOURCE_DIR}/src/spiral/rvv/dft2rvv_a.c")
-                message(FATAL_ERROR "No spiral file found for architecture (rvv)")
-            endif()
-        else()
-            if(NOT EXISTS "${CMAKE_SOURCE_DIR}/src/spiral/c/dft2_a.c")
-                message(FATAL_ERROR "No spiral file found for architecture (c)")
-            endif()
-        endif()
-    endif()
-else()  
-    # Default build
-    if(BUILD_SHARED_LIBS)
-        add_library(juffte_shared SHARED ${OBJ_STD})
-        target_include_directories(juffte_shared PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-        target_link_libraries(juffte_shared PUBLIC m)
-        set_target_properties(juffte_shared PROPERTIES OUTPUT_NAME juffte)
+        set(SPRL_VARIANT   "rvv")
+        set(SPRL_PATH      "${CMAKE_CURRENT_SOURCE_DIR}/src/spiral/rvv")
+        set(SPRL_ARCH_FLAG "-march=rv64gcv")
     else()
-        add_library(juffte STATIC ${OBJ_STD})
-        target_include_directories(juffte PUBLIC ${CMAKE_BINARY_DIR})
+        set(SPRL_VARIANT   "c")
+        set(SPRL_PATH      "${CMAKE_CURRENT_SOURCE_DIR}/src/spiral/c")
+        set(SPRL_ARCH_FLAG "")
     endif()
-endif()
 
-# =========================
-# Install library first
-# =========================
-include(GNUInstallDirs)
+    file(GLOB SPRL_C_SOURCES CONFIGURE_DEPENDS "${SPRL_PATH}/*.c")
+    message(STATUS "Enabling Spiral backend (${SPRL_VARIANT}) from ${SPRL_PATH}")
 
-if(WITHSPRL)
-    if(BUILD_SHARED_LIBS)
-        install(TARGETS jufftesp_shared
-            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        )
-    else()
-        install(TARGETS jufftesp
-            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        )
-    endif()
+    set(JUFFTE_SOURCES ${OBJ_SPRL} ${SPRL_C_SOURCES})
 else()
-    if(BUILD_SHARED_LIBS)
-        install(TARGETS juffte_shared
-            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        )
-    else()
-        install(TARGETS juffte
-            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        )
-    endif()
+    set(JUFFTE_SOURCES ${OBJ_STD})
 endif()
 
-install(DIRECTORY ${CMAKE_BINARY_DIR}/
+# =========================
+# Library
+# =========================
+# The library is always named juffte, whichever backend is compiled in.
+if(BUILD_SHARED_LIBS)
+    set(LIB_TARGET juffte_shared)
+    add_library(${LIB_TARGET} SHARED ${JUFFTE_SOURCES})
+    target_link_libraries(${LIB_TARGET} PUBLIC m)
+    set_target_properties(${LIB_TARGET} PROPERTIES OUTPUT_NAME juffte)
+else()
+    set(LIB_TARGET juffte)
+    add_library(${LIB_TARGET} STATIC ${JUFFTE_SOURCES})
+endif()
+
+# Keep the library's .mod files apart from the tests' and benchmark's.
+set(JUFFTE_MODULE_DIR ${CMAKE_CURRENT_BINARY_DIR}/modules)
+set_target_properties(${LIB_TARGET} PROPERTIES Fortran_MODULE_DIRECTORY ${JUFFTE_MODULE_DIR})
+
+target_include_directories(${LIB_TARGET} PUBLIC
+    $<BUILD_INTERFACE:${JUFFTE_MODULE_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
+if(OpenMP_Fortran_FOUND)
+    target_link_libraries(${LIB_TARGET} PUBLIC OpenMP::OpenMP_Fortran)
+endif()
+if(OpenMP_C_FOUND)
+    # Compile-only: OpenMP::OpenMP_C in the link interface would force every
+    # consumer to enable the C language. The runtime comes in with the Fortran target.
+    separate_arguments(JUFFTE_OMP_C_FLAGS NATIVE_COMMAND "${OpenMP_C_FLAGS}")
+    target_compile_options(${LIB_TARGET} PRIVATE
+        $<$<COMPILE_LANGUAGE:C>:${JUFFTE_OMP_C_FLAGS}>)
+endif()
+
+# The Spiral kernels use ISA intrinsics and need the matching -march.
+if(SPRL_ARCH_FLAG
+   AND CMAKE_C_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$"
+   AND CMAKE_Fortran_COMPILER_ID MATCHES "^(GNU|Flang|LLVMFlang)$")
+    target_compile_options(${LIB_TARGET} PRIVATE ${SPRL_ARCH_FLAG})
+endif()
+
+# =========================
+# Install
+# =========================
+install(TARGETS ${LIB_TARGET}
+    EXPORT juffteTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(DIRECTORY ${JUFFTE_MODULE_DIR}/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILES_MATCHING PATTERN "*.mod"
+)
+
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/juffte.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(EXPORT juffteTargets
+    FILE juffteTargets.cmake
+    NAMESPACE juffte::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/juffte
+)
+
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/juffteConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/juffteConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/juffte
+)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/juffteConfig.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/juffte
 )
 
 # =========================
 # Benchmark
 # =========================
-add_executable(fftbench ${CMAKE_SOURCE_DIR}/benchmark/bench_utils_m.F90 ${CMAKE_SOURCE_DIR}/benchmark/fftbench.F90)
-
-if(WITHSPRL)
-    set(LIB_NAME jufftesp)
-else()
-    set(LIB_NAME juffte)
-endif()
-
-if(BUILD_SHARED_LIBS)
-    set(LIB_TARGET "${LIB_NAME}_shared")
-else()
-    set(LIB_TARGET "${LIB_NAME}")
-endif()
-
+add_executable(fftbench
+    ${CMAKE_CURRENT_SOURCE_DIR}/benchmark/bench_utils_m.F90
+    ${CMAKE_CURRENT_SOURCE_DIR}/benchmark/fftbench.F90
+)
 target_link_libraries(fftbench PRIVATE ${LIB_TARGET})
 
 if(WITHFFTW AND FFTW_FOUND)
-    target_sources(fftbench PRIVATE ${CMAKE_SOURCE_DIR}/benchmark/fftw_m.F90)
-    target_include_directories(fftbench PRIVATE ${FFTW_INCLUDE_DIR})
-    target_link_libraries(fftbench PRIVATE FFTW::fftw3 FFTW::fftw3_omp)
-    target_compile_definitions(fftbench PRIVATE FFTW_ENABLED)
+    target_sources(fftbench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/benchmark/fftw_m.F90)
+    target_link_libraries(fftbench PRIVATE ${FFTW_OMP_LIBRARY} PkgConfig::FFTW)
+    target_compile_definitions(fftbench PRIVATE FFTW)
     message(STATUS "FFTW enabled for benchmark")
 endif()
 
 # =========================
-# C tests
-# =========================
-add_executable(ctest1d ${CMAKE_SOURCE_DIR}/ctests/test1d.c)
-target_link_libraries(ctest1d PRIVATE ${LIB_TARGET})
-
-add_executable(ctest2d ${CMAKE_SOURCE_DIR}/ctests/test2d.c)
-target_link_libraries(ctest2d PRIVATE ${LIB_TARGET})
-
-add_executable(ctest3d ${CMAKE_SOURCE_DIR}/ctests/test3d.c)
-target_link_libraries(ctest3d PRIVATE ${LIB_TARGET})
-
-add_executable(crtest2d ${CMAKE_SOURCE_DIR}/ctests/rtest2d.c)
-target_link_libraries(crtest2d PRIVATE ${LIB_TARGET})
-
-add_executable(crtest3d ${CMAKE_SOURCE_DIR}/ctests/rtest3d.c)
-target_link_libraries(crtest3d PRIVATE ${LIB_TARGET})
-
-add_executable(fftw-test ${CMAKE_SOURCE_DIR}/ctests/fftw-test.c)
-target_include_directories(fftw-test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_compile_definitions(fftw-test PRIVATE FFTW)
-target_link_libraries(fftw-test PRIVATE ${LIB_TARGET} m gfortran)
-
-# =========================
-# Fortran tests
-# =========================
-add_library(test_utils_m_obj OBJECT ${CMAKE_SOURCE_DIR}/tests/test_utils_m.F90)
-
-add_executable(test1d ${CMAKE_SOURCE_DIR}/tests/test1d.F90 $<TARGET_OBJECTS:test_utils_m_obj>)
-target_link_libraries(test1d PRIVATE ${LIB_TARGET})
-
-add_executable(test1d-out ${CMAKE_SOURCE_DIR}/tests/test1d-out.F90 $<TARGET_OBJECTS:test_utils_m_obj>)
-target_link_libraries(test1d-out PRIVATE ${LIB_TARGET})
-
-add_executable(test1d-fftwint ${CMAKE_SOURCE_DIR}/tests/test1d-fftwint.F90 $<TARGET_OBJECTS:test_utils_m_obj>)
-target_link_libraries(test1d-fftwint PRIVATE ${LIB_TARGET})
-
-add_executable(test1dni ${CMAKE_SOURCE_DIR}/tests/test1dni.F90 $<TARGET_OBJECTS:test_utils_m_obj>)
-target_link_libraries(test1dni PRIVATE ${LIB_TARGET})
-
-add_executable(test2d ${CMAKE_SOURCE_DIR}/tests/test2d.F90 $<TARGET_OBJECTS:test_utils_m_obj>)
-target_link_libraries(test2d PRIVATE ${LIB_TARGET})
-
-add_executable(test3d ${CMAKE_SOURCE_DIR}/tests/test3d.F90 $<TARGET_OBJECTS:test_utils_m_obj>)
-target_link_libraries(test3d PRIVATE ${LIB_TARGET})
-
-add_executable(rtest1d ${CMAKE_SOURCE_DIR}/tests/rtest1d.F90 $<TARGET_OBJECTS:test_utils_m_obj>)
-target_link_libraries(rtest1d PRIVATE ${LIB_TARGET})
-
-add_executable(rtest2d ${CMAKE_SOURCE_DIR}/tests/rtest2d.F90 $<TARGET_OBJECTS:test_utils_m_obj>)
-target_link_libraries(rtest2d PRIVATE ${LIB_TARGET})
-
-add_executable(rtest3d ${CMAKE_SOURCE_DIR}/tests/rtest3d.F90 $<TARGET_OBJECTS:test_utils_m_obj>)
-target_link_libraries(rtest3d PRIVATE ${LIB_TARGET})
-
-# =========================
-# Test target
+# Tests
 # =========================
 enable_testing()
 
-# C tests
-add_test(NAME ctest1d COMMAND ${CMAKE_BINARY_DIR}/ctest1d 2)
-add_test(NAME ctest2d COMMAND ${CMAKE_BINARY_DIR}/ctest2d 2 2)
-add_test(NAME ctest3d COMMAND ${CMAKE_BINARY_DIR}/ctest3d 2 2 2)
-add_test(NAME crtest2d COMMAND ${CMAKE_BINARY_DIR}/crtest2d 2 2)
-add_test(NAME crtest3d COMMAND ${CMAKE_BINARY_DIR}/crtest3d 2 2 2)
-add_test(NAME fftw-test COMMAND ${CMAKE_BINARY_DIR}/fftw-test 2)
+set(JUFFTE_TEST_TARGETS "")
+
+# C tests; juffte.h comes from the library's public include directories.
+function(juffte_add_c_test name source)
+    add_executable(${name} ${CMAKE_CURRENT_SOURCE_DIR}/${source})
+    target_link_libraries(${name} PRIVATE ${LIB_TARGET} m)
+    add_test(NAME ${name} COMMAND ${name} ${ARGN})
+    set(JUFFTE_TEST_TARGETS ${JUFFTE_TEST_TARGETS} ${name} PARENT_SCOPE)
+endfunction()
+
+# -DFFTW selects juFFTe's own FFTW shim in juffte.h.
+function(juffte_add_fftw_test name source)
+    juffte_add_c_test(${name} ${source} ${ARGN})
+    target_compile_definitions(${name} PRIVATE FFTW)
+    if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+        target_link_libraries(${name} PRIVATE gfortran)
+    endif()
+    set(JUFFTE_TEST_TARGETS ${JUFFTE_TEST_TARGETS} PARENT_SCOPE)
+endfunction()
+
+juffte_add_c_test(ctest1d  ctests/test1d.c  2)
+juffte_add_c_test(ctest2d  ctests/test2d.c  2 2)
+juffte_add_c_test(ctest3d  ctests/test3d.c  2 2 2)
+juffte_add_c_test(crtest1d ctests/rtest1d.c 2)
+juffte_add_c_test(crtest2d ctests/rtest2d.c 2 2)
+juffte_add_c_test(crtest3d ctests/rtest3d.c 2 2 2)
+
+juffte_add_fftw_test(fftw-test   ctests/fftw-test.c   2)
+juffte_add_fftw_test(fftw-test2d ctests/fftw-test2d.c 2 2)
+juffte_add_fftw_test(fftw-test3d ctests/fftw-test3d.c 2 2 2)
 
 # Fortran tests
-add_test(NAME test1d COMMAND ${CMAKE_BINARY_DIR}/test1d 2)
-add_test(NAME test1d_out COMMAND ${CMAKE_BINARY_DIR}/test1d-out 2)
-add_test(NAME test1d-fftwint COMMAND ${CMAKE_BINARY_DIR}/test1d-fftwint 2)
-add_test(NAME test1dni COMMAND ${CMAKE_BINARY_DIR}/test1dni 2)
-add_test(NAME test2d COMMAND ${CMAKE_BINARY_DIR}/test2d 2 2)
-add_test(NAME test3d COMMAND ${CMAKE_BINARY_DIR}/test3d 2 2 2)
-add_test(NAME rtest1d COMMAND ${CMAKE_BINARY_DIR}/rtest1d 2)
-add_test(NAME rtest2d COMMAND ${CMAKE_BINARY_DIR}/rtest2d 2 2)
-add_test(NAME rtest3d COMMAND ${CMAKE_BINARY_DIR}/rtest3d 2 2 2)
+add_library(test_utils_m_obj OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_utils_m.F90)
 
-set(CTEST_RESOURCE_SPEC_FILE "")
-set_tests_properties(
-    ctest1d ctest2d ctest3d crtest2d crtest3d fftw-test
-    test1d test1d_out test1d-fftwint test1dni test2d test3d
-    rtest1d rtest2d rtest3d
-    PROPERTIES
-    PASS_REGULAR_EXPRESSION "."
-)
+function(juffte_add_fortran_test name source)
+    add_executable(${name}
+        ${CMAKE_CURRENT_SOURCE_DIR}/${source}
+        $<TARGET_OBJECTS:test_utils_m_obj>
+    )
+    target_link_libraries(${name} PRIVATE ${LIB_TARGET})
+    add_test(NAME ${name} COMMAND ${name} ${ARGN})
+    set(JUFFTE_TEST_TARGETS ${JUFFTE_TEST_TARGETS} ${name} PARENT_SCOPE)
+endfunction()
+
+juffte_add_fortran_test(test1d         tests/test1d.F90         2)
+juffte_add_fortran_test(test1d-out     tests/test1d-out.F90     2)
+juffte_add_fortran_test(test1dni       tests/test1dni.F90       2)
+juffte_add_fortran_test(test1d-fftwint tests/test1d-fftwint.F90 2)
+juffte_add_fortran_test(test2d         tests/test2d.F90         2 2)
+juffte_add_fortran_test(test2d-out     tests/test2d-out.F90     2 2)
+juffte_add_fortran_test(test2d-fftwint tests/test2d-fftwint.F90 2 2)
+juffte_add_fortran_test(test3d         tests/test3d.F90         2 2 2)
+juffte_add_fortran_test(test3d-out     tests/test3d-out.F90     2 2 2)
+juffte_add_fortran_test(test3d-fftwint tests/test3d-fftwint.F90 2 2 2)
+juffte_add_fortran_test(rtest1d        tests/rtest1d.F90        2)
+juffte_add_fortran_test(rtest2d        tests/rtest2d.F90        2 2)
+juffte_add_fortran_test(rtest3d        tests/rtest3d.F90        2 2 2)
+
+# The tests exit non-zero on failure. Do not add PASS_REGULAR_EXPRESSION: it makes
+# CTest ignore the exit status and report failures as passes.
+set_tests_properties(${JUFFTE_TEST_TARGETS} PROPERTIES FAIL_REGULAR_EXPRESSION "FAIL")
 
 add_custom_target(run_tests
-    COMMAND bash -c 'ctest --output-on-failure'
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running tests:"
-    DEPENDS ctest1d ctest2d ctest3d crtest2d crtest3d fftw-test
-           test1d test1d_out test1d-fftwint test1dni test2d test3d
-           rtest1d rtest2d rtest3d
+    DEPENDS ${JUFFTE_TEST_TARGETS}
 )
 
 # =========================
@@ -364,5 +364,6 @@ message(STATUS "  With RVV:          ${WITHRVV}")
 message(STATUS "  With FFTW:         ${WITHFFTW}")
 message(STATUS "  Fortran compiler:  ${CMAKE_Fortran_COMPILER}")
 message(STATUS "  OpenMP:            ${OpenMP_Fortran_FOUND}")
+message(STATUS "  Cross compiling:   ${CMAKE_CROSSCOMPILING}")
 message(STATUS "  Install prefix:    ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "------------------------------------------------------------")
