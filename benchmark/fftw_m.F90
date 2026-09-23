@@ -8,7 +8,7 @@ use, intrinsic :: iso_fortran_env
 use, intrinsic :: iso_fortran_env
 use, intrinsic :: iso_c_binding
 use omp_lib
-use utils_m
+use bench_utils_m
     implicit none
     integer :: nthreads, err
 type(C_PTR) :: plan
