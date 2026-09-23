@@ -1,0 +1,12 @@
+# --------------------------------------------------------------------------------------------------
+# SPDX-FileCopyrightText: juFFTe developers
+# SPDX-License-Identifier: Apache-2.0
+# --------------------------------------------------------------------------------------------------
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(OpenMP)
+
+include("${CMAKE_CURRENT_LIST_DIR}/juffteTargets.cmake")
+
+check_required_components(juffte)
