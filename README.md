@@ -12,7 +12,66 @@ A modern Fast Fourier Transform library inspired by [FFTE](https://www.ffte.jp/)
 Requirement: Fortran 2003 compiler. Also, C99 compiler, if Spiral kernels are used. Also, OpenMP.
 Tested with GCC (Gfortran), NVIDIA HPC SDK (nvfortran), Flang, and Intel compilers.
 
-To build:
+CMake is the recommended build. Configure from the repository root:
+
+```
+cmake -S . -B build
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+cmake --install build --prefix /your/installation/folder
+```
+
+Options:
+
+| Option | Effect |
+| ------------------------- | ------------------------------------------- |
+| `-DWITHSPRL=ON`           | Spiral kernel backend                       |
+| `-DWITHRVV=ON`            | RISC-V RVV kernels (implies `WITHSPRL`)     |
+| `-DWITHSVE=ON`            | Arm SVE kernels (implies `WITHSPRL`)        |
+| `-DWITHFFTW=ON`           | Build the FFTW comparison into the benchmark|
+| `-DBUILD_SHARED_LIBS=ON`  | Shared instead of static library            |
+
+Only the RVV kernels are currently generated: `-DWITHSVE=ON`, and `-DWITHSPRL=ON` on its
+own, stop at configure time until those kernel sets exist.
+
+To use a different compiler, for example Intel's:
+
+```
+cmake -S . -B build -DCMAKE_Fortran_COMPILER=ifx -DCMAKE_C_COMPILER=icx
+```
+
+Installing writes the library, the public `.mod` files, `src/juffte.h` and a CMake
+package config, so a downstream project can use it directly:
+
+```cmake
+find_package(juffte REQUIRED)
+target_link_libraries(myapp PRIVATE juffte::juffte)
+```
+
+### Cross compiling for RISC-V
+
+A toolchain file is provided for a `riscv64-unknown-linux-gnu` cross toolchain:
+
+```
+cmake -S . -B build-riscv -DCMAKE_TOOLCHAIN_FILE=cmake/riscv-rvv.cmake \
+      -DWITHSPRL=ON -DWITHRVV=ON
+cmake --build build-riscv -j
+```
+
+Override `RISCV_TOOLCHAIN_PREFIX` (default `/opt/riscv`) and `RISCV_TARGET_TRIPLE`
+(default `riscv64-unknown-linux-gnu`) if the toolchain lives elsewhere.
+
+Executables are linked statically, and if `qemu-riscv64-static` is installed it is
+registered as the CTest emulator, so the suite can be run under emulation:
+
+```
+ctest --test-dir build-riscv --output-on-failure
+```
+
+### Makefile build
+
+A plain Makefile build also exists, and is what the `tests`, `ctests` and `benchmark`
+directories link against by default:
 
 ```
 cd src
@@ -20,34 +79,8 @@ make
 make install PREFIX=/your/installation/folder
 ```
 
+It takes `FC=ifx`, `WITHSPRL=1` and `WITHRVV=1` in the same spirit as the CMake options.
 Edit the Makefile if necessary for your system setup.
-
-To build with Spiral:
-
-```
-make WITHSPRL=1
-```
-
-To use compilers other than gfortran, for example Intel's Fortran compiler:
-
-```
-make FC=ifx
-```
-
-CMake build is also available:
-
-```
-cd src
-mkdir build
-cmake ../
-make install
-```
-
-### Example Build for RISC-V RVV ready CPUs
-
-```
-make WITHSPRL=1 WITHRVV=1
-```
 
 ## Usage
 
@@ -103,7 +136,8 @@ gfortran -fopenmp your_code.f90 -ljuffte
 
 ## Build Code with juFFTe
 
-To use juFFTe, link the library with `-ljuffte`. For the Spiral version, use `-ljufftesp` instead. When using from C/C++, include Fortran runtime libraries, e.g., for GCC:
+To use juFFTe, link the library with `-ljuffte`. The Makefile build emits `libjufftesp.a` for the
+Spiral version, so use `-ljufftesp` there; the CMake build always produces `libjuffte`. When using from C/C++, include Fortran runtime libraries, e.g., for GCC:
 
 ```
 gcc your_code.c -ljuffte -lm -lgfortran
