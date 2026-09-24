@@ -181,6 +181,7 @@ else()
     set(JUFFTE_SOURCES ${OBJ_STD})
 endif()
 
+
 # =========================
 # Library
 # =========================
@@ -224,9 +225,18 @@ if(SPRL_ARCH_FLAG
 endif()
 
 # =========================
+# FFTW compatibility layer
+# =========================
+# Its own library: the shim exports the same symbol names as real FFTW, so it
+# must not be forced on anything that also links libfftw3 (the benchmark does).
+add_library(juffte_fftw ${CMAKE_CURRENT_SOURCE_DIR}/src/juffte_fftw.c)
+target_link_libraries(juffte_fftw PUBLIC ${LIB_TARGET})
+set_target_properties(juffte_fftw PROPERTIES OUTPUT_NAME juffte_fftw)
+
+# =========================
 # Install
 # =========================
-install(TARGETS ${LIB_TARGET}
+install(TARGETS ${LIB_TARGET} juffte_fftw
     EXPORT juffteTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -270,7 +280,7 @@ target_link_libraries(fftbench PRIVATE ${LIB_TARGET})
 if(WITHFFTW AND FFTW_FOUND)
     target_sources(fftbench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/benchmark/fftw_m.F90)
     target_link_libraries(fftbench PRIVATE ${FFTW_OMP_LIBRARY} PkgConfig::FFTW)
-    target_compile_definitions(fftbench PRIVATE FFTW)
+    target_compile_definitions(fftbench PRIVATE WITHFFTW)
     message(STATUS "FFTW enabled for benchmark")
 endif()
 
@@ -289,10 +299,10 @@ function(juffte_add_c_test name source)
     set(JUFFTE_TEST_TARGETS ${JUFFTE_TEST_TARGETS} ${name} PARENT_SCOPE)
 endfunction()
 
-# -DFFTW selects juFFTe's own FFTW shim in juffte.h.
+# These exercise the FFTW shim, which is always built into the library.
 function(juffte_add_fftw_test name source)
     juffte_add_c_test(${name} ${source} ${ARGN})
-    target_compile_definitions(${name} PRIVATE FFTW)
+    target_link_libraries(${name} PRIVATE juffte_fftw)
     if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         target_link_libraries(${name} PRIVATE gfortran)
     endif()

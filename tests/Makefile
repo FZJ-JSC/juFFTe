@@ -17,7 +17,7 @@ ifeq ($(WITHSPRL), 1)
 endif
 ifeq ($(WITHFFTW), 1)
 	FFTWINC ?= /usr/include
-	FFTWFLAGS = -I $(FFTWINC) -lfftw3 -DFFTW
+	FFTWFLAGS = -I $(FFTWINC) -lfftw3 -DWITHFFTW
 endif
 
 OMPFLAGS = -fopenmp

@@ -6,13 +6,13 @@
 program test3d
     use, intrinsic :: iso_c_binding
     use, intrinsic :: iso_fortran_env
-#ifndef FFTW
+#ifndef WITHFFTW
     use juffte
 #endif
     use test_utils_m
 
     implicit none
-#ifdef FFTW
+#ifdef WITHFFTW
       include 'fftw3.f03'
 #endif
     complex(real64),allocatable    :: a(:), a_out(:)
@@ -54,9 +54,8 @@ program test3d
     call dump(a_out, n)
     plan = fftw_plan_dft_3d(nx, ny, nz, a_out, a, FFTW_BACKWARD, FFTW_ESTIMATE)
    call fftw_execute_dft(plan, a_out, a)
-#ifdef FFTW
+    ! Both backends follow FFTW's convention: the backward transform is unnormalised.
     a = a/n
-#endif
     print*, "after backrward a"
     call dump(a, n)
     call fftw_destroy_plan(plan)

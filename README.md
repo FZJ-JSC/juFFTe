@@ -115,15 +115,29 @@ Edit the Makefile if necessary for your system setup.
 
 ### FFTW API (drop-in compatibility)
 
-| **function**                                             | **Description**                |
-| -------------------------------------------------------- | ------------------------------ |
-| `fftw_malloc(size)`                                      | Allocate aligned memory        |
-| `fftw_plan_dft_1d(n, in, out, sign, flags)`              | Create 1-D FFT plan            |
-| `fftw_execute_dft(plan)`                                 | Execute FFT (C/C++ API)        |
-| `fftw_execute_dft(plan, in, out)`                        | Execute FFT (Fortran API)      |
-| `fftw_free(ptr)`                                         | Free aligned memory            |
+| **function**                                              | **C** | **Fortran** |
+| --------------------------------------------------------- | :---: | :---------: |
+| `fftw_malloc(size)`                                       | yes   | –           |
+| `fftw_free(ptr)`                                          | yes   | –           |
+| `fftw_plan_dft_1d(n, in, out, sign, flags)`               | yes   | yes         |
+| `fftw_plan_dft_2d(nx, ny, in, out, sign, flags)`          | yes   | yes         |
+| `fftw_plan_dft_3d(nx, ny, nz, in, out, sign, flags)`      | yes   | yes         |
+| `fftw_execute(plan)`                                      | yes   | –           |
+| `fftw_execute_dft(plan, in, out)`                         | yes   | yes         |
+| `fftw_destroy_plan(plan)`                                 | yes   | yes         |
 
-See the example files `fftw-test.c` and `fftw-test.F90` in the test folders.
+The layer is always built — no build option or macro is needed to use it. From C, include
+`juffte.h` instead of `fftw3.h` and link `-ljuffte_fftw -ljuffte`; from Fortran, `use juffte`
+instead of `include 'fftw3.f03'` and link `-ljuffte`.
+
+The C shim lives in its own library because it exports the same symbol names as real FFTW.
+Keeping it separate means a program can link juFFTe and libfftw3 side by side — which is how
+the benchmark compares the two.
+
+Known limitation: only one plan can be live at a time. Creating a second plan currently
+fails. See the open issues.
+
+See the example files `fftw-test.c` and `test1d-fftwint.F90` in the test folders.
 
 ### OpenMP
 
@@ -140,7 +154,8 @@ To use juFFTe, link the library with `-ljuffte`. The Makefile build emits `libju
 Spiral version, so use `-ljufftesp` there; the CMake build always produces `libjuffte`. When using from C/C++, include Fortran runtime libraries, e.g., for GCC:
 
 ```
-gcc your_code.c -ljuffte -lm -lgfortran
+gcc your_code.c -ljuffte -lm -lgfortran          # native juFFTe C API
+gcc your_code.c -ljuffte_fftw -ljuffte -lm -lgfortran   # FFTW-compatible API
 ```
 
 ## Contributing

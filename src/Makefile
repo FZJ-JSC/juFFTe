@@ -6,7 +6,7 @@
 WITHSPRL ?= 0
 WITHSVE  ?= 0
 WITHRVV  ?= 0 
-LIBS = libjuffte.a
+LIBS = libjuffte.a libjuffte_fftw.a
 
 
 CC ?= gcc 
@@ -21,7 +21,7 @@ OMPFLAGS = -fopenmp
 ifeq ($(WITHSPRL), 1)
 	FCFLAGS += -DSPRL
 	SPRLPATH = spiral/c
-	LIBS = libjufftesp.a
+	LIBS = libjufftesp.a libjuffte_fftw.a
 	FILE_EXISTS := $(wildcard spiral/c/dft2c_a.c)
 
 	ifeq ($(WITHSVE), 1)
@@ -72,6 +72,10 @@ libjuffte.a: $(OBJ)
 	ar rcs $@ $(OBJ)
 libjufftesp.a: $(OBJSP) $(OBJSPC)
 	ar rcs $@ $(OBJSP) $(OBJSPC)
+# Separate archive: the shim exports real FFTW's symbol names, so it must not be
+# forced on anything that also links libfftw3.
+libjuffte_fftw.a: juffte_fftw.o
+	ar rcs $@ juffte_fftw.o
 
 param.o : param.F90
 	$(FC) $(FCFLAGS) -c $<
@@ -101,6 +105,9 @@ zdfft3d_m.o : zdfft3d_m.F90 zdfft2d_m.o zfft1d_m.o
 	$(FC) $(FCFLAGS) -I. -c $<
 juffte.o : juffte.F90 zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o utils_m.o
 	$(FC) $(FCFLAGS) -I. -c $<
+juffte_fftw.o : juffte_fftw.c juffte.h
+	$(CC) $(CFLAGS) -c $<
+
 %.o : $(SPRLPATH)/%.c
 	$(CC) $(CFLAGS) -c $< 
 

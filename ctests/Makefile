@@ -20,7 +20,6 @@ ifeq ($(WITHFFTW), 1)
 	FFTWINC ?= /usr/include
 	FFTWLIB ?= /usr/lib
 	FFTWFLAGS = -I $(FFTWINC) -L $(FFTWLIB) -lfftw3 -DWITHFFTW
-	LIBFLAGS = $(FFTWINC FFTWLIB) $(FFTWFLAGS)
 endif
 
 ifneq (,$(filter $(CC),icx icx-cc))
@@ -66,13 +65,13 @@ rtest3d : rtest3d.c
 	$(CC) $(CFLAGS) $< $(LIBFLAGS) -o $@
 
 fftw-test : fftw-test.c
-	$(CC) $(CFLAGS) -DFFTW $< $(LIBFLAGS) -o $@
+	$(CC) $(CFLAGS) $< -L $(LIBDIR) -ljuffte_fftw $(LIBFLAGS) $(FFTWFLAGS) -o $@
 
 fftw-test2d : fftw-test2d.c
-	$(CC) $(CFLAGS) -DFFTW $< $(LIBFLAGS) -o $@
+	$(CC) $(CFLAGS) $< -L $(LIBDIR) -ljuffte_fftw $(LIBFLAGS) $(FFTWFLAGS) -o $@
 
 fftw-test3d : fftw-test3d.c
-	$(CC) $(CFLAGS) -DFFTW $< $(LIBFLAGS) -o $@
+	$(CC) $(CFLAGS) $< -L $(LIBDIR) -ljuffte_fftw $(LIBFLAGS) $(FFTWFLAGS) -o $@
 
 test  :   test1d test2d test3d rtest1d rtest2d rtest3d fftw-test fftw-test2d fftw-test3d
 	./test1d 2 && ./test2d 2 2 && ./test3d 2 2 2 && ./rtest1d 2 && ./rtest2d 2 2 && ./rtest3d 2 2 2 && ./fftw-test 2 && ./fftw-test2d 2 2 && ./fftw-test3d 2 2 2
