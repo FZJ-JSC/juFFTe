@@ -13,7 +13,7 @@ INCDIR ?= ../src
 LIBFLAGS = -L $(LIBDIR)  -I $(INCDIR) -ljuffte
 
 ifeq ($(WITHSPRL), 1)
-    LIBFLAGS = -L $(LIBDIR) -I $(INCDIR) -ljufftesp
+    LIBFLAGS = -L $(LIBDIR) -I $(INCDIR) -ljuffte
 endif
 ifeq ($(WITHFFTW), 1)
 	FFTWINC ?= /usr/include

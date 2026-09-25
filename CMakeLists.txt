@@ -181,6 +181,9 @@ else()
     set(JUFFTE_SOURCES ${OBJ_STD})
 endif()
 
+# FFTW compatibility layer; its symbols are juffte_-prefixed, so it can live here.
+list(APPEND JUFFTE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/juffte_fftw.c)
+
 
 # =========================
 # Library
@@ -225,18 +228,9 @@ if(SPRL_ARCH_FLAG
 endif()
 
 # =========================
-# FFTW compatibility layer
-# =========================
-# Its own library: the shim exports the same symbol names as real FFTW, so it
-# must not be forced on anything that also links libfftw3 (the benchmark does).
-add_library(juffte_fftw ${CMAKE_CURRENT_SOURCE_DIR}/src/juffte_fftw.c)
-target_link_libraries(juffte_fftw PUBLIC ${LIB_TARGET})
-set_target_properties(juffte_fftw PROPERTIES OUTPUT_NAME juffte_fftw)
-
-# =========================
 # Install
 # =========================
-install(TARGETS ${LIB_TARGET} juffte_fftw
+install(TARGETS ${LIB_TARGET}
     EXPORT juffteTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -302,7 +296,6 @@ endfunction()
 # These exercise the FFTW shim, which is always built into the library.
 function(juffte_add_fftw_test name source)
     juffte_add_c_test(${name} ${source} ${ARGN})
-    target_link_libraries(${name} PRIVATE juffte_fftw)
     if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         target_link_libraries(${name} PRIVATE gfortran)
     endif()

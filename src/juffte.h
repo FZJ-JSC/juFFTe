@@ -35,6 +35,7 @@ void zdfft3d_c(CLXTYP *a, double *a_r, int nx, int ny, int nz, int iopt);
 // ----------------------------------------------------------------------------
 // FFTW compatibility layer. Always available; the definitions live in the
 // library, so this header may be included from any number of translation units.
+// It is part of libjuffte -- there is no separate library to link.
 // ----------------------------------------------------------------------------
 
 // Matches FFTW's fallback typedef, so in[i][0] / in[i][1] behave as expected.
@@ -51,19 +52,35 @@ typedef double fftw_complex[2];
 // Opaque, and a pointer as in FFTW, so that `fftw_plan p = NULL;` compiles.
 typedef struct juffte_plan_s *fftw_plan;
 
-void *fftw_malloc(size_t n);
-void fftw_free(void *p);
+// The entry points carry juffte_ names so that the library exports nothing that
+// clashes with real FFTW; a program can therefore link juFFTe and libfftw3 side
+// by side (the benchmark does). The macros below give source compatibility: code
+// written against FFTW keeps calling fftw_*, and including this header instead of
+// fftw3.h redirects those calls into juFFTe.
+void *juffte_fftw_malloc(size_t n);
+void juffte_fftw_free(void *p);
 
-fftw_plan fftw_plan_dft_1d(int n, fftw_complex *in, fftw_complex *out, int dir, int flag);
-fftw_plan fftw_plan_dft_2d(int nx, int ny, fftw_complex *in, fftw_complex *out, int dir, int flag);
-fftw_plan fftw_plan_dft_3d(int nx, int ny, int nz, fftw_complex *in, fftw_complex *out,
-                           int dir, int flag);
+fftw_plan juffte_fftw_plan_dft_1d(int n, fftw_complex *in, fftw_complex *out, int dir, int flag);
+fftw_plan juffte_fftw_plan_dft_2d(int nx, int ny, fftw_complex *in, fftw_complex *out,
+                                  int dir, int flag);
+fftw_plan juffte_fftw_plan_dft_3d(int nx, int ny, int nz, fftw_complex *in, fftw_complex *out,
+                                  int dir, int flag);
 
-void fftw_execute(const fftw_plan p);
-void fftw_execute_dft(const fftw_plan p, fftw_complex *in, fftw_complex *out);
-void fftw_destroy_plan(fftw_plan p);
+void juffte_fftw_execute(const fftw_plan p);
+void juffte_fftw_execute_dft(const fftw_plan p, fftw_complex *in, fftw_complex *out);
+void juffte_fftw_destroy_plan(fftw_plan p);
 
-void fft_plan_print(const fftw_plan p); // debug helper, not part of the FFTW API
+void juffte_fft_plan_print(const fftw_plan p); // debug helper, not part of the FFTW API
+
+#define fftw_malloc        juffte_fftw_malloc
+#define fftw_free          juffte_fftw_free
+#define fftw_plan_dft_1d   juffte_fftw_plan_dft_1d
+#define fftw_plan_dft_2d   juffte_fftw_plan_dft_2d
+#define fftw_plan_dft_3d   juffte_fftw_plan_dft_3d
+#define fftw_execute       juffte_fftw_execute
+#define fftw_execute_dft   juffte_fftw_execute_dft
+#define fftw_destroy_plan  juffte_fftw_destroy_plan
+#define fft_plan_print     juffte_fft_plan_print
 
 #ifdef __cplusplus
 }

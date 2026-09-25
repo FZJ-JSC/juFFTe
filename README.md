@@ -126,13 +126,13 @@ Edit the Makefile if necessary for your system setup.
 | `fftw_execute_dft(plan, in, out)`                         | yes   | yes         |
 | `fftw_destroy_plan(plan)`                                 | yes   | yes         |
 
-The layer is always built — no build option or macro is needed to use it. From C, include
-`juffte.h` instead of `fftw3.h` and link `-ljuffte_fftw -ljuffte`; from Fortran, `use juffte`
-instead of `include 'fftw3.f03'` and link `-ljuffte`.
+The layer is always built into `libjuffte` — no build option, macro or extra library. From C,
+include `juffte.h` instead of `fftw3.h`; from Fortran, `use juffte` instead of
+`include 'fftw3.f03'`. Either way, link `-ljuffte` instead of `-lfftw3`.
 
-The C shim lives in its own library because it exports the same symbol names as real FFTW.
-Keeping it separate means a program can link juFFTe and libfftw3 side by side — which is how
-the benchmark compares the two.
+The C entry points are exported as `juffte_fftw_*` and `juffte.h` maps the `fftw_*` names onto
+them, so juFFTe exports nothing that clashes with real FFTW. A program can therefore link both
+libraries at once — which is how the benchmark compares them.
 
 Known limitation: only one plan can be live at a time. Creating a second plan currently
 fails. See the open issues.
@@ -150,12 +150,11 @@ gfortran -fopenmp your_code.f90 -ljuffte
 
 ## Build Code with juFFTe
 
-To use juFFTe, link the library with `-ljuffte`. The Makefile build emits `libjufftesp.a` for the
-Spiral version, so use `-ljufftesp` there; the CMake build always produces `libjuffte`. When using from C/C++, include Fortran runtime libraries, e.g., for GCC:
+To use juFFTe, link the library with `-ljuffte`. There is one library for every backend and for
+both the native and the FFTW-compatible API. When using from C/C++, include Fortran runtime libraries, e.g., for GCC:
 
 ```
-gcc your_code.c -ljuffte -lm -lgfortran          # native juFFTe C API
-gcc your_code.c -ljuffte_fftw -ljuffte -lm -lgfortran   # FFTW-compatible API
+gcc your_code.c -ljuffte -lm -lgfortran
 ```
 
 ## Contributing

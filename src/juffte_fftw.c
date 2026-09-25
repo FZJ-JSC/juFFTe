@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // --------------------------------------------------------------------------------------------------
 //
-// FFTW compatibility layer. Declarations are in juffte.h.
+// FFTW compatibility layer. Declarations are in juffte.h, which also maps the
+// fftw_* names used below onto the exported juffte_fftw_* symbols.
 
 #include <stdio.h>
 #include <stdlib.h>

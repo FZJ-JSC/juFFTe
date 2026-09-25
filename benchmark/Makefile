@@ -13,7 +13,7 @@ INCDIR ?= ../src
 WITHFFTW ?= 0
 LIBFLAGS = -L $(LIBDIR)  -I $(INCDIR) -ljuffte
 ifeq ($(WITHSPRL), 1)
-    LIBFLAGS = -L $(LIBDIR) -I $(INCDIR) -ljufftesp
+    LIBFLAGS = -L $(LIBDIR) -I $(INCDIR) -ljuffte
 endif
 FCFLAGS1 = 
 OMPFLAGS = -fopenmp
