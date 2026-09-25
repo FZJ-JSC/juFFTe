@@ -5,7 +5,7 @@
 
 CC ?= gcc
 CFLAGS = -g -O3
-WITHFFTW  ?= 0
+WITH_REFERENCE_FFTW  ?= 0
 # -g -O3 -ftree-vectorize -fopt-info-vec -mavx512f -fopt-info-vec-missed
 # -fno-tree-vectorize -fno-openmp-simd  # disable vectorization
 LIBDIR ?= ../src
@@ -16,10 +16,10 @@ LIBFLAGSSP = -L $(LIBDIR) -I $(INCDIR) -ljuffte -lm -lgfortran
 CFLAGS1 = 
 OMPFLAGS = -fopenmp -fopenmp-simd
  
-ifeq ($(WITHFFTW), 1)
+ifeq ($(WITH_REFERENCE_FFTW), 1)
 	FFTWINC ?= /usr/include
 	FFTWLIB ?= /usr/lib
-	FFTWFLAGS = -I $(FFTWINC) -L $(FFTWLIB) -lfftw3 -DWITHFFTW
+	FFTWFLAGS = -I $(FFTWINC) -L $(FFTWLIB) -lfftw3 -DUSE_REFERENCE_FFTW
 endif
 
 ifneq (,$(filter $(CC),icx icx-cc))

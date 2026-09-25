@@ -6,13 +6,13 @@
 program test2d
     use, intrinsic :: iso_c_binding
     use, intrinsic :: iso_fortran_env
-#ifndef WITHFFTW
+#ifndef USE_REFERENCE_FFTW
     use juffte
 #endif
     use test_utils_m
 
     implicit none
-#ifdef WITHFFTW
+#ifdef USE_REFERENCE_FFTW
       include 'fftw3.f03'
 #endif
     complex(real64),allocatable    :: a(:), a_out(:)

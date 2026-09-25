@@ -16,7 +16,7 @@ make
 To build with FFTW comparison support:
 
 ```
-make WITHFFTW=1 FFTWDIR=/path/to/fftw
+make WITH_REFERENCE_FFTW=1 FFTWDIR=/path/to/fftw
 ```
 
 To build with Spiral kernel library:
@@ -69,14 +69,14 @@ The benchmark outputs:
 - **TIME**: Average execution time per FFT operation (seconds)
 - **MFLOPS**: Estimated megaflops
 
-When built with FFTW (`WITHFFTW=1`), it also outputs FFTW timing for comparison.
+When built with FFTW (`WITH_REFERENCE_FFTW=1`), it also outputs FFTW timing for comparison.
 
 ## Utilities
 
 | File | Description |
 | ---- | ----------- |
 | `bench_utils_m.F90` | Benchmark utilities (argument parsing, array init) |
-| `fftw_m.F90` | FFTW interface for comparison (when `WITHFFTW=1`) |
+| `fftw_m.F90` | FFTW interface for comparison (when `WITH_REFERENCE_FFTW=1`) |
 | `utils_m.F90` | General utilities |
 | `sc.sh` | Shell script for running scalability tests |
 

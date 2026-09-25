@@ -28,7 +28,7 @@ Options:
 | `-DWITHSPRL=ON`           | Spiral kernel backend                       |
 | `-DWITHRVV=ON`            | RISC-V RVV kernels (implies `WITHSPRL`)     |
 | `-DWITHSVE=ON`            | Arm SVE kernels (implies `WITHSPRL`)        |
-| `-DWITHFFTW=ON`           | Build the FFTW comparison into the benchmark|
+| `-DWITH_REFERENCE_FFTW=ON`| Build the comparisons against a reference FFTW|
 | `-DBUILD_SHARED_LIBS=ON`  | Shared instead of static library            |
 
 Only the RVV kernels are currently generated: `-DWITHSVE=ON`, and `-DWITHSPRL=ON` on its

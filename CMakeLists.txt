@@ -15,7 +15,7 @@ option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 option(WITHSPRL "Build with Spiral backend" OFF)
 option(WITHSVE "Build with SVE backend" OFF)
 option(WITHRVV "Build with RVV backend" OFF)
-option(WITHFFTW "Build with FFTW support" OFF)
+option(WITH_REFERENCE_FFTW "Build the comparisons against a reference FFTW" OFF)
 
 # =========================
 # Validate options
@@ -31,7 +31,7 @@ if(WITHRVV AND NOT WITHSPRL)
 endif()
 
 # FFTW is optional, used only by the benchmark comparison. No FindFFTW module exists.
-if(WITHFFTW)
+if(WITH_REFERENCE_FFTW)
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND)
         pkg_check_modules(FFTW IMPORTED_TARGET fftw3)
@@ -51,13 +51,13 @@ if(WITHFFTW)
     elseif(FFTW_FOUND)
         message(WARNING "FFTW found but neither fftw3_omp nor fftw3_threads was; "
                         "FFTW support will be disabled.")
-        set(WITHFFTW OFF)
+        set(WITH_REFERENCE_FFTW OFF)
     else()
         message(WARNING "FFTW not found. FFTW support will be disabled.")
-        set(WITHFFTW OFF)
+        set(WITH_REFERENCE_FFTW OFF)
     endif()
 else()
-    set(WITHFFTW OFF)
+    set(WITH_REFERENCE_FFTW OFF)
 endif()
 
 # =========================
@@ -271,10 +271,10 @@ add_executable(fftbench
 )
 target_link_libraries(fftbench PRIVATE ${LIB_TARGET})
 
-if(WITHFFTW AND FFTW_FOUND)
+if(WITH_REFERENCE_FFTW AND FFTW_FOUND)
     target_sources(fftbench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/benchmark/fftw_m.F90)
     target_link_libraries(fftbench PRIVATE ${FFTW_OMP_LIBRARY} PkgConfig::FFTW)
-    target_compile_definitions(fftbench PRIVATE WITHFFTW)
+    target_compile_definitions(fftbench PRIVATE USE_REFERENCE_FFTW)
     message(STATUS "FFTW enabled for benchmark")
 endif()
 
@@ -364,7 +364,7 @@ message(STATUS "  Build shared libs: ${BUILD_SHARED_LIBS}")
 message(STATUS "  With SPIRAL:       ${WITHSPRL}")
 message(STATUS "  With SVE:          ${WITHSVE}")
 message(STATUS "  With RVV:          ${WITHRVV}")
-message(STATUS "  With FFTW:         ${WITHFFTW}")
+message(STATUS "  Reference FFTW:    ${WITH_REFERENCE_FFTW}")
 message(STATUS "  Fortran compiler:  ${CMAKE_Fortran_COMPILER}")
 message(STATUS "  OpenMP:            ${OpenMP_Fortran_FOUND}")
 message(STATUS "  Cross compiling:   ${CMAKE_CROSSCOMPILING}")

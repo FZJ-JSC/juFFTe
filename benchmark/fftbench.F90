@@ -8,7 +8,7 @@ program fftbench
     use bench_utils_m
     use juffte
 
-#ifdef WITHFFTW
+#ifdef USE_REFERENCE_FFTW
 use fftw_m
 #endif
 
@@ -53,7 +53,7 @@ endif
     write(6, *) "  TIME       =", time0
     write(6, *) "  MFLOPS     =", flops
     write(6, *) ""
-#ifdef WITHFFTW
+#ifdef USE_REFERENCE_FFTW
 call fftw_warmup(size,dim,a,b)
 
 call fftw_bench(size,dim,a,b,time0)
