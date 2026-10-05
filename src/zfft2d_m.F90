@@ -223,7 +223,7 @@ endif
 !$OMP PARALLEL DO
 !DIR$ VECTOR ALIGNED
             do i = 1, nx*ny
-                out(i) = conjg(a(i))*dn
+                out(i) = conjg(out(i))*dn
             end do
         else
 !$OMP PARALLEL DO
