@@ -37,6 +37,9 @@ program test1d
 
     call zfft1d(a, n, juffte_fw, a_out)
 
+        print*, "After FFT fw a"
+    call dump(a, n)
+
     print*, "After FFT fw a_out"
     call dump(a_out, n)
     

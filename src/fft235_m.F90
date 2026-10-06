@@ -25,7 +25,7 @@ subroutine fft235_o(a, b, w, n, ip, a_out)
     complex(real64), intent(inout) :: a(*), b(*), w(*)
     complex(real64), intent(out) :: a_out(*)
     integer, intent(in) :: ip(*), n
-    integer :: j, k, key, kp4, kp8, l, m
+    integer :: j, k, key, kp4, kp8, l, m, nleft
 
     if (ip(1) /= 1) then
         kp4 = 2 - mod(ip(1) + 2, 3)
@@ -35,94 +35,90 @@ subroutine fft235_o(a, b, w, n, ip, a_out)
         kp8 = 0
     end if
 
-    key = 1
+    ! The input a is only read, by the first stage. The other stages alternate
+    ! between b and a_out, arranged so that the last stage reads b and writes a_out.
+    ! key: where the data is now (0 = a, 1 = b, 2 = a_out).
+    ! nleft: stages still to run, including the current one.
+    nleft = kp8 + ip(3) + kp4 + ip(2)
+    if (ip(1) == 1) nleft = nleft + 1
+    key = 0
     j = 1
     l = n
     m = 1
     do k = 1, kp8
         l = l/8
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft8(a, b, w(j), m, l)
-            else
-                call fft8(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft8(a, a_out, w(j), m, l)
-            else
-                call fft8(b, a_out, w(j), m, l)
-            end if
-        end if
+        call stage(8)
         m = m*8
         j = j + l*7
     end do
     do k = 1, ip(3)
         l = l/5
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft5(a, b, w(j), m, l)
-            else
-                call fft5(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft5(a, a_out, w(j), m, l)
-            else
-                call fft5(b, a_out, w(j), m, l)
-            end if
-        end if
+        call stage(5)
         m = m*5
         j = j + l*4
     end do
     do k = 1, kp4
         l = l/4
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft4(a, b, w(j), m, l)
-            else
-                call fft4(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft4(a, a_out, w(j), m, l)
-            else
-                call fft4(b, a_out, w(j), m, l)
-            end if
-        end if
+        call stage(4)
         m = m*4
         j = j + l*3
     end do
     do k = 1, ip(2)
         l = l/3
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft3(a, b, w(j), m, l)
-            else
-                call fft3(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft3(a, a_out, w(j), m, l)
-            else
-                call fft3(b, a_out, w(j), m, l)
-            end if
-        end if
+        call stage(3)
         m = m*3
         j = j + l*2
     end do
-    if (ip(1) == 1) then
-        if (key >= 0) then
-            call fft2(a, a_out, m)
-        else
-            call fft2(b, a_out, m)
-        end if
-    end if
+    if (ip(1) == 1) call stage(2)
     return
+
+contains
+
+    subroutine stage(r)
+        integer, intent(in) :: r
+
+        if (nleft == 1) then                ! last stage: write a_out
+            if (key == 0) then
+                call kernel(r, a, a_out)
+            else
+                call kernel(r, b, a_out)    ! key == 1
+            end if
+        else if (mod(nleft, 2) == 0) then   ! even number left: write b
+            if (key == 0) then
+                call kernel(r, a, b)
+            else
+                call kernel(r, a_out, b)    ! key == 2
+            end if
+            key = 1
+        else                                ! odd number left: write a_out
+            if (key == 0) then
+                call kernel(r, a, a_out)
+            else
+                call kernel(r, b, a_out)    ! key == 1
+            end if
+            key = 2
+        end if
+        nleft = nleft - 1
+    end subroutine stage
+
+    subroutine kernel(r, x, y)
+        integer, intent(in) :: r
+        complex(real64), intent(inout) :: x(*), y(*)
+
+        select case (r)
+        case (8)
+            call fft8(x, y, w(j), m, l)
+        case (5)
+            call fft5(x, y, w(j), m, l)
+        case (4)
+            call fft4(x, y, w(j), m, l)
+        case (3)
+            call fft3(x, y, w(j), m, l)
+        case (2)
+            call fft2(x, y, m)
+        end select
+    end subroutine kernel
+
 end subroutine fft235_o
 
 subroutine fft235(a, b, w, n, ip)
@@ -381,7 +377,7 @@ subroutine fft235_o_r32(a, b, w, n, ip, a_out)
     complex(real32), intent(inout) :: a(*), b(*), w(*)
     complex(real32), intent(out) :: a_out(*)
     integer, intent(in) :: ip(*), n
-    integer :: j, k, key, kp4, kp8, l, m
+    integer :: j, k, key, kp4, kp8, l, m, nleft
 
     if (ip(1) /= 1) then
         kp4 = 2 - mod(ip(1) + 2, 3)
@@ -391,94 +387,90 @@ subroutine fft235_o_r32(a, b, w, n, ip, a_out)
         kp8 = 0
     end if
 
-    key = 1
+    ! The input a is only read, by the first stage. The other stages alternate
+    ! between b and a_out, arranged so that the last stage reads b and writes a_out.
+    ! key: where the data is now (0 = a, 1 = b, 2 = a_out).
+    ! nleft: stages still to run, including the current one.
+    nleft = kp8 + ip(3) + kp4 + ip(2)
+    if (ip(1) == 1) nleft = nleft + 1
+    key = 0
     j = 1
     l = n
     m = 1
     do k = 1, kp8
         l = l/8
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft8_r32(a, b, w(j), m, l)
-            else
-                call fft8_r32(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft8_r32(a, a_out, w(j), m, l)
-            else
-                call fft8_r32(b, a_out, w(j), m, l)
-            end if
-        end if
+        call stage(8)
         m = m*8
         j = j + l*7
     end do
     do k = 1, ip(3)
         l = l/5
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft5_r32(a, b, w(j), m, l)
-            else
-                call fft5_r32(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft5_r32(a, a_out, w(j), m, l)
-            else
-                call fft5_r32(b, a_out, w(j), m, l)
-            end if
-        end if
+        call stage(5)
         m = m*5
         j = j + l*4
     end do
     do k = 1, kp4
         l = l/4
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft4_r32(a, b, w(j), m, l)
-            else
-                call fft4_r32(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft4_r32(a, a_out, w(j), m, l)
-            else
-                call fft4_r32(b, a_out, w(j), m, l)
-            end if
-        end if
+        call stage(4)
         m = m*4
         j = j + l*3
     end do
     do k = 1, ip(2)
         l = l/3
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft3_r32(a, b, w(j), m, l)
-            else
-                call fft3_r32(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft3_r32(a, a_out, w(j), m, l)
-            else
-                call fft3_r32(b, a_out, w(j), m, l)
-            end if
-        end if
+        call stage(3)
         m = m*3
         j = j + l*2
     end do
-    if (ip(1) == 1) then
-        if (key >= 0) then
-            call fft2_r32(a, a_out, m)
-        else
-            call fft2_r32(b, a_out, m)
-        end if
-    end if
+    if (ip(1) == 1) call stage(2)
     return
+
+contains
+
+    subroutine stage(r)
+        integer, intent(in) :: r
+
+        if (nleft == 1) then                ! last stage: write a_out
+            if (key == 0) then
+                call kernel(r, a, a_out)
+            else
+                call kernel(r, b, a_out)    ! key == 1
+            end if
+        else if (mod(nleft, 2) == 0) then   ! even number left: write b
+            if (key == 0) then
+                call kernel(r, a, b)
+            else
+                call kernel(r, a_out, b)    ! key == 2
+            end if
+            key = 1
+        else                                ! odd number left: write a_out
+            if (key == 0) then
+                call kernel(r, a, a_out)
+            else
+                call kernel(r, b, a_out)    ! key == 1
+            end if
+            key = 2
+        end if
+        nleft = nleft - 1
+    end subroutine stage
+
+    subroutine kernel(r, x, y)
+        integer, intent(in) :: r
+        complex(real32), intent(inout) :: x(*), y(*)
+
+        select case (r)
+        case (8)
+            call fft8_r32(x, y, w(j), m, l)
+        case (5)
+            call fft5_r32(x, y, w(j), m, l)
+        case (4)
+            call fft4_r32(x, y, w(j), m, l)
+        case (3)
+            call fft3_r32(x, y, w(j), m, l)
+        case (2)
+            call fft2_r32(x, y, m)
+        end select
+    end subroutine kernel
+
 end subroutine fft235_o_r32
 
 subroutine fft235_r32(a, b, w, n, ip)

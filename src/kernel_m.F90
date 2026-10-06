@@ -72,7 +72,8 @@ end subroutine fft3a
 
 subroutine fft3b(a, b, w, m, l)
     implicit none
-    complex(real64), intent(inout) :: a(m,l,*), b(m,3,*), w(2,*)
+    complex(real64), intent(in) :: a(m,l,*)
+    complex(real64), intent(inout) :: b(m,3,*), w(2,*)
     integer, intent(in) :: l
     complex(real64) :: c0, c1, c2, d0, d1, d2, w1, w2
     real(real64), parameter :: c31 = 0.86602540378443865d0, c32 = 0.5d0
