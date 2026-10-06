@@ -222,7 +222,7 @@ subroutine fft235(a, b, w, n, ip)
     end do
     if (ip(1) == 1) then
         if (key >= 0) then
-            call fft2(a, a, m)
+            call fft2(a, m=m)
         else
             call fft2(b, a, m)
         end if
@@ -578,7 +578,7 @@ subroutine fft235_r32(a, b, w, n, ip)
     end do
     if (ip(1) == 1) then
         if (key >= 0) then
-            call fft2_r32(a, a, m)
+            call fft2_r32(a, m=m)
         else
             call fft2_r32(b, a, m)
         end if

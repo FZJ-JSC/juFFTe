@@ -77,7 +77,7 @@ subroutine zfft1d_64(a, n, iopt, out)
         if (present(out)) then
 
             if (iopt == juffte_bw) then
-                call fft235_o( out, b, b(n + 1), n, ip, out)
+                call fft235( out, b, b(n + 1), n, ip)
             else
                 call fft235_o( a, b, b(n + 1), n, ip, out)
             end if
@@ -237,7 +237,7 @@ subroutine zfft1d_32(a, n, iopt, out)
         if (present(out)) then
 
             if (iopt == juffte_bw) then
-                call fft235_o_r32( out, b_r32, b_r32(n + 1), n, ip, out)
+                call fft235_r32( out, b_r32, b_r32(n + 1), n, ip)
             else
                 call fft235_o_r32( a, b_r32, b_r32(n + 1), n, ip, out)
             end if

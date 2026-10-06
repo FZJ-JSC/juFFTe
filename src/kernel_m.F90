@@ -18,11 +18,13 @@ contains
 
 subroutine fft2(a, b, m)
     implicit none
-    complex(real64), intent(inout) :: a(m,*), b(m,*)
+    complex(real64), intent(inout)           :: a(m,*)
+    complex(real64), optional, intent(inout) :: b(m,*)
     integer, intent(in) :: m
     complex(real64) :: c0, c1
     integer :: i
 
+if (present(b)) then
 !DIR$ VECTOR ALIGNED
     do i = 1, m
         c0 = a(i, 1)
@@ -30,6 +32,15 @@ subroutine fft2(a, b, m)
         b(i, 1) = c0 + c1
         b(i, 2) = c0 - c1
     end do
+else
+!DIR$ VECTOR ALIGNED
+    do i = 1, m
+        c0 = a(i, 1)
+        c1 = a(i, 2)
+        a(i, 1) = c0 + c1
+        a(i, 2) = c0 - c1
+    end do
+endif
     return
 end subroutine fft2
 
@@ -64,7 +75,7 @@ subroutine fft3b(a, b, w, m, l)
     complex(real64), intent(inout) :: a(m,l,*), b(m,3,*), w(2,*)
     integer, intent(in) :: l
     complex(real64) :: c0, c1, c2, d0, d1, d2, w1, w2
-    real, parameter :: c31 = 0.86602540378443865d0, c32 = 0.5d0
+    real(real64), parameter :: c31 = 0.86602540378443865d0, c32 = 0.5d0
     integer :: i, m, j
 
 !DIR$ VECTOR ALIGNED
@@ -435,20 +446,35 @@ end subroutine fft8b
 
 subroutine fft2_r32(a, b, m)
     implicit none
-    complex(real32), intent(inout) :: a(m,*), b(m,*)
+    complex(real32), intent(inout) :: a(m,*)
+    complex(real32), optional, intent(out) :: b(m,*)
     integer, intent(in) :: m
     complex(real32) :: c0, c1
     integer :: i
 
+if (present (b)) then
 !DIR$ VECTOR ALIGNED
     do i = 1, m
         c0 = a(i, 1)
         c1 = a(i, 2)
+        
         b(i, 1) = c0 + c1
         b(i, 2) = c0 - c1
     end do
+else
+!DIR$ VECTOR ALIGNED
+    do i = 1, m
+        c0 = a(i, 1)
+        c1 = a(i, 2)
+
+        a(i, 1) = c0 + c1
+        a(i, 2) = c0 - c1
+    end do
+endif
     return
 end subroutine fft2_r32
+
+
 
 subroutine fft3a_r32(a, b, w, l)
     implicit none
