@@ -6,11 +6,16 @@
 module test_utils_m
 use, intrinsic :: iso_fortran_env
 implicit none
-real(real64), parameter :: errtol = 0.00001
-real(real32), parameter :: errtol_r32 = 0.0001
+
+    integer, parameter :: tollconst = 10
 
 private
-public :: init, dump, errtol, errtol_r32
+public :: init, dump, geterrtol
+
+    interface geterrtol
+        module procedure :: geterrtol_r32
+        module procedure :: geterrtol_r64
+    end interface
 
 
     interface init
@@ -28,6 +33,22 @@ public :: init, dump, errtol, errtol_r32
     end interface
 
 contains
+
+    real(real32) function geterrtol_r32(r, n)
+        real(real32) :: r
+        integer      :: n
+
+        geterrtol_r32 = real(tollconst, real32) * epsilon(r) * (log(real(n, real32))/ log(2.0_real32))
+    
+    end function geterrtol_r32
+    
+    real(real64) function geterrtol_r64(r, n)
+        real(real64) :: r
+        integer      :: n
+
+        geterrtol_r64 = real(tollconst, real64) * epsilon(r) * (log(real(n, real64))/ log(2.0_real64))
+    
+    end function geterrtol_r64
 
     subroutine init_r32(a, n)
         complex(real32), intent(inout), contiguous :: a(:)

@@ -16,6 +16,8 @@ program test3d
     integer :: nx, ny, nz, num_args
     character(len=100) :: args
     character(len=20) :: exe
+    real(real32) :: errtol_r32
+    real(real64) :: errtol
 
 
     num_args = command_argument_count()
@@ -46,6 +48,8 @@ program test3d
     call dump(a, nx*ny*nz)
     call zfft3d(a, nx, ny, nz, juffte_init)
     a_in = a(nx*ny*nz)
+    errtol = geterrtol(real(a_in), nx*ny*nz)
+    ! write(6,*) "errtol = ",  errtol
 
     call zfft3d(a, nx, ny, nz, juffte_fw)
     call dump(a, nx*ny*nz)
@@ -56,7 +60,7 @@ program test3d
     call getarg(0, args)
     read(args, "(A10)") exe
 
-    if (abs(dble(a_in) - dble(a(nx*ny*nz))) < errtol) then
+    if (abs((dble(a_in) - dble(a(nx*ny*nz)))/dble(a_in)) < errtol) then
         print *, exe, "PASS"
 
     else
@@ -75,6 +79,8 @@ program test3d
     call dump(a_32, nx*ny*nz)
     call zfft3d(a_32, nx, ny, nz, juffte_init)
     a_32_in = a_32(nx*ny*nz)
+    errtol_r32 = geterrtol(real(a_32_in), nx*ny*nz)
+    ! write(6,*) "errtol = ",  errtol_r32
 
     call zfft3d(a_32, nx, ny, nz, juffte_fw)
     call dump(a_32, nx*ny*nz)
@@ -83,7 +89,7 @@ program test3d
     call dump(a_32, nx*ny*nz)
 
 
-    if (abs(real(a_32_in) - real(a_32(nx*ny*nz))) < errtol_r32) then
+    if (abs((real(a_32_in) - real(a_32(nx*ny*nz)))/real(a_32_in)) < errtol_r32) then
         print *, exe, "PASS"
 
     else

@@ -86,7 +86,7 @@ test_utils_m.o : test_utils_m.F90
 	$(FC) -c $(FCFLAGS) $(FCFLAGS1) $< 
 
 test  :   test1d test1d-out test1dni test1d-fftwint test2d-fftwint test3d-fftwint test2d test3d rtest1d rtest2d rtest3d
-	./test1d 2 && ./test1d-out 2 && ./test1dni 2 &&  ./test2d 2 2  && ./test3d 2 2 2 && ./rtest1d 2 &&./rtest2d 2 2 && ./rtest3d 2 2 2 && ./test1d-fftwint 2 ./test2d-fftwint 2 2 ./test3d-fftwint 2 2 2
+	./test1d 2 && ./test1d-out 2 && ./test1dni 2 &&  ./test2d 2 2  && ./test3d 2 2 2 && ./rtest1d 2 &&./rtest2d 2 2 && ./rtest3d 2 2 2 && ./test1d-fftwint 2 && ./test2d-fftwint 2 2 && ./test3d-fftwint 2 2 2
 
 clean:
 	rm -f test1d test1d-out test2d-out test3d-out test1d-fftwint test2d-fftwint test3d-fftwint test1dni test2d test3d rtest1d rtest2d rtest3d *.o *.mod 

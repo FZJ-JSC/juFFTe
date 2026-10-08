@@ -17,6 +17,8 @@ program test2d
     integer                     :: nx, ny, num_args
     character(len=100)          :: args
     character(len=20)           :: exe
+    real(real32)                :: errtol_r32
+    real(real64)                :: errtol
 
     num_args = command_argument_count()
     if (num_args < 2) then
@@ -42,6 +44,8 @@ program test2d
     call dump(a, nx*ny)
     call zfft2d(a, nx, ny, juffte_init)
     a_in = a(nx*ny)
+    errtol = geterrtol(real(a_in), nx*ny)
+    ! write(6,*) "errtol = ",  errtol
 
     call zfft2d(a, nx, ny, juffte_fw)
     call dump(a, nx*ny)
@@ -52,7 +56,7 @@ program test2d
     call getarg(0, args)
     read(args, "(A10)") exe
 
-    if (abs(dble(a_in) - dble(a(nx*ny))) < errtol) then
+    if (abs((dble(a_in) - dble(a(nx*ny)))/dble(a_in)) < errtol) then
         print *, exe, "PASS"
 
     else
@@ -71,6 +75,8 @@ program test2d
     call dump(a_32, nx*ny)
     call zfft2d(a_32, nx, ny, juffte_init)
     a_32_in = a_32(nx*ny)
+    errtol_r32 = geterrtol(real(a_32_in), nx*ny)
+    ! write(6,*) "errtol = ",  errtol_r32
 
     call zfft2d(a_32, nx, ny, juffte_fw)
     call dump(a_32, nx*ny)
@@ -79,7 +85,7 @@ program test2d
     call dump(a_32, nx*ny)
 
 
-    if (abs(real(a_32_in) - real(a_32(nx*ny))) < errtol_r32) then
+    if (abs((real(a_32_in) - real(a_32(nx*ny)))/real(a_32_in)) < errtol_r32) then
         print *, exe, "PASS"
 
     else

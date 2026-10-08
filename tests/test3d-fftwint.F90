@@ -21,6 +21,7 @@ program test3d
     character(len=100)        :: args
     character(len=20)         :: exe
     type(C_PTR)               :: plan
+    real(real64)              :: errtol
 
     num_args = command_argument_count()
     if (num_args < 3) then
@@ -47,6 +48,8 @@ program test3d
     call dump(a, n)
 
     a_in = a(n)
+    errtol = geterrtol(real(a_in), n)
+    ! write(6,*) "errtol = ",  errtol
     plan = fftw_plan_dft_3d(nx, ny, nz, a, a_out, FFTW_FORWARD, FFTW_ESTIMATE)
    call fftw_execute_dft(plan, a, a_out)
     call fftw_destroy_plan(plan)
@@ -63,7 +66,7 @@ program test3d
     call getarg(0, args)
     read(args, "(A20)") exe
 
-    if (abs(real(a_in) - real(a(n))) < errtol) then
+    if (abs((real(a_in) - real(a(n)))/real(a_in)) < errtol) then
         print *, exe, "PASS"
 
     else

@@ -18,6 +18,8 @@ program rtest2d
     integer                      :: nx, ny, num_args
     character(len=100)           :: args
     character(len=20)            :: exe
+    real(real32)                 :: errtol_r32
+    real(real64)                 :: errtol
 
     num_args = command_argument_count()
     if (num_args < 2) then
@@ -43,6 +45,8 @@ allocate (a(nx*ny), a_c(nx*ny))
     call init(a, nx*ny)
     call dump(a, nx*ny)
     a_in = a(nx*ny)
+    errtol = geterrtol(a_in, nx*ny)
+    ! write(6,*) "errtol = ",  errtol
     call dzfft2d(a, a_c, nx, ny, juffte_init)
     call dzfft2d(a, a_c, nx, ny, juffte_fw)
 
@@ -58,7 +62,7 @@ allocate (a(nx*ny), a_c(nx*ny))
     call getarg(0, args)
     read(args, "(A20)") exe
 
-    if (abs(a_in - a(nx*ny)) < errtol) then
+    if (abs((a_in - a(nx*ny))/a_in) < errtol) then
         print *, exe, "PASS"
 
     else
@@ -78,6 +82,8 @@ allocate (a(nx*ny), a_c(nx*ny))
     call init(a_r32, nx*ny)
     call dump(a_r32, nx*ny)
     a_in_r32 = a_r32(nx*ny)
+    errtol_r32 = geterrtol(a_in_r32, nx*ny)
+    ! write(6,*) "errtol = ",  errtol_r32
     call dzfft2d(a_r32, a_c_r32, nx, ny, juffte_init)
     call dzfft2d(a_r32, a_c_r32, nx, ny, juffte_fw)
 
@@ -93,7 +99,7 @@ allocate (a(nx*ny), a_c(nx*ny))
     call getarg(0, args)
     read(args, "(A20)") exe
 
-    if (abs(a_in_r32 - a_r32(nx*ny)) < errtol_r32) then
+    if (abs((a_in_r32 - a_r32(nx*ny))/a_in_r32) < errtol_r32) then
         print *, exe, "PASS"
 
     else
