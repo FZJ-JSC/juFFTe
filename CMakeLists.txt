@@ -284,12 +284,35 @@ endif()
 enable_testing()
 
 set(JUFFTE_TEST_TARGETS "")
+set(JUFFTE_TESTS "")
+
+# Lengths the round-trip tests run at. Length 2 alone never needs a second radix-3
+# stage (9), radix 5 (100), every radix (120) or a non-square shape, which is how the
+# single-precision fft3b constant fixed in e253422 went unnoticed. The six-step branch
+# (1-D n > 174762) is not covered yet: it crashes at the default 8 MB stack, and its
+# out-of-place backward and 1-D r2c paths are broken.
+set(JUFFTE_SIZES_1D "2" "9" "96" "100" "120" "1024")
+set(JUFFTE_SIZES_2D "2 2" "9 96" "96 64" "120 100" "256 256")
+set(JUFFTE_SIZES_3D "2 2 2" "9 16 20" "12 18 20" "32 32 32")
+
+# One CTest case per size, named <target>_<size>, e.g. test2d_9x96. Each size runs in
+# its own process: initialising a second size in one process hits the single-plan limit.
+function(juffte_add_test_sizes target)
+    foreach(size IN LISTS ARGN)
+        string(REPLACE " " ";" args "${size}")
+        string(REPLACE " " "x" tag "${size}")
+        add_test(NAME ${target}_${tag} COMMAND ${target} ${args})
+        list(APPEND JUFFTE_TESTS ${target}_${tag})
+    endforeach()
+    set(JUFFTE_TESTS ${JUFFTE_TESTS} PARENT_SCOPE)
+endfunction()
 
 # C tests; juffte.h comes from the library's public include directories.
 function(juffte_add_c_test name source)
     add_executable(${name} ${CMAKE_CURRENT_SOURCE_DIR}/${source})
     target_link_libraries(${name} PRIVATE ${LIB_TARGET} m)
-    add_test(NAME ${name} COMMAND ${name} ${ARGN})
+    juffte_add_test_sizes(${name} ${ARGN})
+    set(JUFFTE_TESTS ${JUFFTE_TESTS} PARENT_SCOPE)
     set(JUFFTE_TEST_TARGETS ${JUFFTE_TEST_TARGETS} ${name} PARENT_SCOPE)
 endfunction()
 
@@ -299,19 +322,21 @@ function(juffte_add_fftw_test name source)
     if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         target_link_libraries(${name} PRIVATE gfortran)
     endif()
+    set(JUFFTE_TESTS ${JUFFTE_TESTS} PARENT_SCOPE)
     set(JUFFTE_TEST_TARGETS ${JUFFTE_TEST_TARGETS} PARENT_SCOPE)
 endfunction()
 
-juffte_add_c_test(ctest1d  ctests/test1d.c  2)
-juffte_add_c_test(ctest2d  ctests/test2d.c  2 2)
-juffte_add_c_test(ctest3d  ctests/test3d.c  2 2 2)
-juffte_add_c_test(crtest1d ctests/rtest1d.c 2)
-juffte_add_c_test(crtest2d ctests/rtest2d.c 2 2)
-juffte_add_c_test(crtest3d ctests/rtest3d.c 2 2 2)
+juffte_add_c_test(ctest1d  ctests/test1d.c  ${JUFFTE_SIZES_1D})
+juffte_add_c_test(ctest2d  ctests/test2d.c  ${JUFFTE_SIZES_2D})
+juffte_add_c_test(ctest3d  ctests/test3d.c  ${JUFFTE_SIZES_3D})
+juffte_add_c_test(crtest1d ctests/rtest1d.c ${JUFFTE_SIZES_1D})
+juffte_add_c_test(crtest2d ctests/rtest2d.c ${JUFFTE_SIZES_2D})
+juffte_add_c_test(crtest3d ctests/rtest3d.c ${JUFFTE_SIZES_3D})
 
-juffte_add_fftw_test(fftw-test   ctests/fftw-test.c   2)
-juffte_add_fftw_test(fftw-test2d ctests/fftw-test2d.c 2 2)
-juffte_add_fftw_test(fftw-test3d ctests/fftw-test3d.c 2 2 2)
+# These print their output but check nothing, so more sizes would add no coverage.
+juffte_add_fftw_test(fftw-test   ctests/fftw-test.c   "2")
+juffte_add_fftw_test(fftw-test2d ctests/fftw-test2d.c "2 2")
+juffte_add_fftw_test(fftw-test3d ctests/fftw-test3d.c "2 2 2")
 
 # Fortran tests
 add_library(test_utils_m_obj OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_utils_m.F90)
@@ -322,27 +347,28 @@ function(juffte_add_fortran_test name source)
         $<TARGET_OBJECTS:test_utils_m_obj>
     )
     target_link_libraries(${name} PRIVATE ${LIB_TARGET})
-    add_test(NAME ${name} COMMAND ${name} ${ARGN})
+    juffte_add_test_sizes(${name} ${ARGN})
+    set(JUFFTE_TESTS ${JUFFTE_TESTS} PARENT_SCOPE)
     set(JUFFTE_TEST_TARGETS ${JUFFTE_TEST_TARGETS} ${name} PARENT_SCOPE)
 endfunction()
 
-juffte_add_fortran_test(test1d         tests/test1d.F90         2)
-juffte_add_fortran_test(test1d-out     tests/test1d-out.F90     2)
-juffte_add_fortran_test(test1dni       tests/test1dni.F90       2)
-juffte_add_fortran_test(test1d-fftwint tests/test1d-fftwint.F90 2)
-juffte_add_fortran_test(test2d         tests/test2d.F90         2 2)
-juffte_add_fortran_test(test2d-out     tests/test2d-out.F90     2 2)
-juffte_add_fortran_test(test2d-fftwint tests/test2d-fftwint.F90 2 2)
-juffte_add_fortran_test(test3d         tests/test3d.F90         2 2 2)
-juffte_add_fortran_test(test3d-out     tests/test3d-out.F90     2 2 2)
-juffte_add_fortran_test(test3d-fftwint tests/test3d-fftwint.F90 2 2 2)
-juffte_add_fortran_test(rtest1d        tests/rtest1d.F90        2)
-juffte_add_fortran_test(rtest2d        tests/rtest2d.F90        2 2)
-juffte_add_fortran_test(rtest3d        tests/rtest3d.F90        2 2 2)
+juffte_add_fortran_test(test1d         tests/test1d.F90         ${JUFFTE_SIZES_1D})
+juffte_add_fortran_test(test1d-out     tests/test1d-out.F90     ${JUFFTE_SIZES_1D})
+juffte_add_fortran_test(test1dni       tests/test1dni.F90       ${JUFFTE_SIZES_1D})
+juffte_add_fortran_test(test1d-fftwint tests/test1d-fftwint.F90 ${JUFFTE_SIZES_1D})
+juffte_add_fortran_test(test2d         tests/test2d.F90         ${JUFFTE_SIZES_2D})
+juffte_add_fortran_test(test2d-out     tests/test2d-out.F90     ${JUFFTE_SIZES_2D})
+juffte_add_fortran_test(test2d-fftwint tests/test2d-fftwint.F90 ${JUFFTE_SIZES_2D})
+juffte_add_fortran_test(test3d         tests/test3d.F90         ${JUFFTE_SIZES_3D})
+juffte_add_fortran_test(test3d-out     tests/test3d-out.F90     ${JUFFTE_SIZES_3D})
+juffte_add_fortran_test(test3d-fftwint tests/test3d-fftwint.F90 ${JUFFTE_SIZES_3D})
+juffte_add_fortran_test(rtest1d        tests/rtest1d.F90        ${JUFFTE_SIZES_1D})
+juffte_add_fortran_test(rtest2d        tests/rtest2d.F90        ${JUFFTE_SIZES_2D})
+juffte_add_fortran_test(rtest3d        tests/rtest3d.F90        ${JUFFTE_SIZES_3D})
 
 # The tests exit non-zero on failure. Do not add PASS_REGULAR_EXPRESSION: it makes
 # CTest ignore the exit status and report failures as passes.
-set_tests_properties(${JUFFTE_TEST_TARGETS} PROPERTIES FAIL_REGULAR_EXPRESSION "FAIL")
+set_tests_properties(${JUFFTE_TESTS} PROPERTIES FAIL_REGULAR_EXPRESSION "FAIL")
 
 add_custom_target(run_tests
     COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure

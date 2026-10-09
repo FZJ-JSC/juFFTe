@@ -73,8 +73,16 @@ fftw-test2d : fftw-test2d.c
 fftw-test3d : fftw-test3d.c
 	$(CC) $(CFLAGS) $< $(LIBFLAGS) $(FFTWFLAGS) -o $@
 
+# Same lengths as CMakeLists.txt (JUFFTE_SIZES_*); see the comment there.
+SIZES_1D = 2 9 96 100 120 1024
+SIZES_2D = "2 2" "9 96" "96 64" "120 100" "256 256"
+SIZES_3D = "2 2 2" "9 16 20" "12 18 20" "32 32 32"
+
 test  :   test1d test2d test3d rtest1d rtest2d rtest3d fftw-test fftw-test2d fftw-test3d
-	./test1d 2 && ./test2d 2 2 && ./test3d 2 2 2 && ./rtest1d 2 && ./rtest2d 2 2 && ./rtest3d 2 2 2 && ./fftw-test 2 && ./fftw-test2d 2 2 && ./fftw-test3d 2 2 2
+	for t in test1d rtest1d; do for s in $(SIZES_1D); do ./$$t $$s || exit 1; done; done
+	for t in test2d rtest2d; do for s in $(SIZES_2D); do ./$$t $$s || exit 1; done; done
+	for t in test3d rtest3d; do for s in $(SIZES_3D); do ./$$t $$s || exit 1; done; done
+	./fftw-test 2 && ./fftw-test2d 2 2 && ./fftw-test3d 2 2 2
 
 clean:
 	rm -f test1d test1dni test2d test3d rtest1d rtest2d rtest3d fftw-test fftw-test2d fftw-test3d *.o *.mod 
