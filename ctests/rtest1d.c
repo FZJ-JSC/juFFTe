@@ -8,13 +8,16 @@
 #include <string.h>
 #include <math.h>
 #include <complex.h>
+#include <float.h>
 #include "../src/juffte.h"
 
 #define NDA 16777216
+#define TOLLCONST 10
 
 void init(double *a, int n);
 void dump(const double _Complex *a, int n);
 void rdump(const double *a, int n);
+double geterrtol(int n);
 
 int main(int argc, char **argv) {
     static double a[NDA], b[NDA];
@@ -33,6 +36,8 @@ int main(int argc, char **argv) {
 
     init(a, n);
     a_in = a[n - 1];  // C is 0-based
+    double errtol = geterrtol(n);
+    // printf("errtol = %e\n", errtol);
 
 
     dzfft1d_c(a, a_c, n, juffte_init);
@@ -47,7 +52,7 @@ int main(int argc, char **argv) {
     strncpy(exe, argv[0], sizeof(exe) - 1);
     exe[sizeof(exe) - 1] = '\0';
 
-    if (fabs(a_in - a[n - 1]) < 1e-10) {
+    if (fabs((a_in - a[n - 1]) / a_in) < errtol) {
         printf("%s PASS\n", exe);
     } else {
         printf("%s FAIL\n", exe);
@@ -73,4 +78,8 @@ void rdump(const double *a, int n) {
     for (int i = 0; i < n; ++i) {
         printf("%d %f\n", i + 1, a[i]);
     }
+}
+
+double geterrtol(int n) {
+    return TOLLCONST * DBL_EPSILON * log2((double)n);
 }

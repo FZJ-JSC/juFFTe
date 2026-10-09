@@ -7,13 +7,15 @@
 #include <stdlib.h>
 #include <complex.h>
 #include <math.h>
-#include "../src/juffte.h"  
+#include <float.h>
+#include "../src/juffte.h"
 
 #define NDA 16777216
-#define TOL 1e-12
+#define TOLLCONST 10
 
 void init(double _Complex* a, int n);
 void dump(const double _Complex* a, int n);
+double geterrtol(int n);
 
 int main(int argc, char** argv) {
     int nx, ny, nz;
@@ -46,6 +48,8 @@ int main(int argc, char** argv) {
     zfft3d_c(a, nx, ny, nz, juffte_init);
 
     double _Complex a_in = a[n - 1];
+    double errtol = geterrtol(n);
+    // printf("errtol = %e\n", errtol);
 
     // Inverse FFT
     zfft3d_c(a, nx, ny, nz, juffte_fw);
@@ -55,9 +59,9 @@ int main(int argc, char** argv) {
     zfft3d_c(a, nx, ny, nz, juffte_bw);
     dump(a, n);
 
-    double err = cabs(a[n - 1] - a_in);
+    double err = cabs(a[n - 1] - a_in) / cabs(a_in);
 
-    if (err < TOL) {
+    if (err < errtol) {
         printf("%s PASS\n", argv[0]);
     } else {
         printf("%s FAIL (error = %.3e)\n", argv[0], err);
@@ -79,4 +83,8 @@ void dump(const double _Complex* a, int n) {
     for (int i = 0; i < n; ++i) {
         printf("%4d: %.6f + %.6fi\n", i + 1, creal(a[i]), cimag(a[i]));
     }
+}
+
+double geterrtol(int n) {
+    return TOLLCONST * DBL_EPSILON * log2((double)n);
 }
