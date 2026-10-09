@@ -366,6 +366,13 @@ juffte_add_fortran_test(rtest1d        tests/rtest1d.F90        ${JUFFTE_SIZES_1
 juffte_add_fortran_test(rtest2d        tests/rtest2d.F90        ${JUFFTE_SIZES_2D})
 juffte_add_fortran_test(rtest3d        tests/rtest3d.F90        ${JUFFTE_SIZES_3D})
 
+# Forward transform against a direct DFT, element by element. Catches what a round
+# trip cancels: a wrong sign convention, a consistent scaling error.
+add_executable(accuracy ${CMAKE_CURRENT_SOURCE_DIR}/tests/accuracy.F90)
+target_link_libraries(accuracy PRIVATE ${LIB_TARGET})
+juffte_add_test_sizes(accuracy ${JUFFTE_SIZES_1D} ${JUFFTE_SIZES_2D} ${JUFFTE_SIZES_3D})
+list(APPEND JUFFTE_TEST_TARGETS accuracy)
+
 # The tests exit non-zero on failure. Do not add PASS_REGULAR_EXPRESSION: it makes
 # CTest ignore the exit status and report failures as passes.
 set_tests_properties(${JUFFTE_TESTS} PROPERTIES FAIL_REGULAR_EXPRESSION "FAIL")
