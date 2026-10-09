@@ -7,14 +7,16 @@ module test_utils_m
 use, intrinsic :: iso_fortran_env
 implicit none
 
-    integer, parameter :: tollconst = 10
-
 private
-public :: init, dump, geterrtol
+public :: init, dump, roundtrip_check
 
-    interface geterrtol
-        module procedure :: geterrtol_r32
-        module procedure :: geterrtol_r64
+    ! Checks a forward + backward round trip x -> xhat over the whole array, against
+    ! the rounding-error bound  ||x - xhat||_2 <= 2 log2(n) eps ||x||_2.
+    interface roundtrip_check
+        module procedure :: roundtrip_check_c32
+        module procedure :: roundtrip_check_c64
+        module procedure :: roundtrip_check_r32
+        module procedure :: roundtrip_check_r64
     end interface
 
 
@@ -34,21 +36,42 @@ public :: init, dump, geterrtol
 
 contains
 
-    real(real32) function geterrtol_r32(r, n)
-        real(real32) :: r
-        integer      :: n
+    logical function roundtrip_check_c32(x, xhat, n)
+        complex(real32), intent(in) :: x(:), xhat(:)
+        integer, intent(in)         :: n
+        roundtrip_check_c32 = report(real(norm2(abs(x(1:n) - xhat(1:n))) / norm2(abs(x(1:n))), real64), &
+                                     real(epsilon(1.0_real32), real64), n)
+    end function roundtrip_check_c32
 
-        geterrtol_r32 = real(tollconst, real32) * epsilon(r) * (log(real(n, real32))/ log(2.0_real32))
-    
-    end function geterrtol_r32
-    
-    real(real64) function geterrtol_r64(r, n)
-        real(real64) :: r
-        integer      :: n
+    logical function roundtrip_check_c64(x, xhat, n)
+        complex(real64), intent(in) :: x(:), xhat(:)
+        integer, intent(in)         :: n
+        roundtrip_check_c64 = report(norm2(abs(x(1:n) - xhat(1:n))) / norm2(abs(x(1:n))), &
+                                     epsilon(1.0_real64), n)
+    end function roundtrip_check_c64
 
-        geterrtol_r64 = real(tollconst, real64) * epsilon(r) * (log(real(n, real64))/ log(2.0_real64))
-    
-    end function geterrtol_r64
+    logical function roundtrip_check_r32(x, xhat, n)
+        real(real32), intent(in) :: x(:), xhat(:)
+        integer, intent(in)      :: n
+        roundtrip_check_r32 = report(real(norm2(x(1:n) - xhat(1:n)) / norm2(x(1:n)), real64), &
+                                     real(epsilon(1.0_real32), real64), n)
+    end function roundtrip_check_r32
+
+    logical function roundtrip_check_r64(x, xhat, n)
+        real(real64), intent(in) :: x(:), xhat(:)
+        integer, intent(in)      :: n
+        roundtrip_check_r64 = report(norm2(x(1:n) - xhat(1:n)) / norm2(x(1:n)), &
+                                     epsilon(1.0_real64), n)
+    end function roundtrip_check_r64
+
+    logical function report(err, eps, n)
+        real(real64), intent(in) :: err, eps
+        integer, intent(in)      :: n
+        real(real64)             :: bound
+        bound = 2.0_real64 * log(real(n, real64)) / log(2.0_real64) * eps
+        print '(a,es10.3,a,es10.3)', '  relative 2-norm error ', err, '   bound 2 log2(n) eps ', bound
+        report = err <= bound
+    end function report
 
     subroutine init_r32(a, n)
         complex(real32), intent(inout), contiguous :: a(:)

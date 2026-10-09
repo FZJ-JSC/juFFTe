@@ -10,12 +10,11 @@
 #include <math.h>
 #include <float.h>
 #include "../src/juffte.h"
+#include "test_utils.h"
 
-#define TOLLCONST 10
 
 void init(double _Complex* a, int n);
 void dump(const double _Complex* a, int n);
-double geterrtol(int n);
 
 int main(int argc, char** argv) {
     int n;
@@ -39,9 +38,19 @@ int main(int argc, char** argv) {
     init(a, n);
     dump(a, n);
 
-    double _Complex a_in = a[n - 1];  // Save original last value
-    double errtol = geterrtol(n);
-    // printf("errtol = %e\n", errtol);
+    // Keep the input for the round-trip check.
+
+    double _Complex* a_in = malloc(n * sizeof *a_in);
+
+    if (!a_in) {
+
+        perror("malloc");
+
+        return 1;
+
+    }
+
+    memcpy(a_in, a, n * sizeof *a_in);
 
     zfft1d_c(a, n, juffte_init);   
     zfft1d_c(a, n, juffte_fw);     
@@ -50,17 +59,17 @@ int main(int argc, char** argv) {
     zfft1d_c(a, n, juffte_bw);    
     dump(a, n);
 
-    double err = cabs(a[n - 1] - a_in) / cabs(a_in);
-
     const char* exe = argv[0];
-    if (err < errtol) {
+    if (roundtrip_check_c(a_in, a, n)) {
         printf("%s PASS\n", exe);
     } else {
-        printf("%s FAIL (error = %e)\n", exe, err);
+        printf("%s FAIL\n", exe);
         return 1;
     }
 
     free(a);
+
+    free(a_in);
 
     return 0;
 }
@@ -76,8 +85,4 @@ void dump(const double _Complex* a, int n) {
     for (int i = 0; i < n; ++i) {
         printf("%4d: %.4f + %.4fi\n", i + 1, creal(a[i]), cimag(a[i]));
     }
-}
-
-double geterrtol(int n) {
-    return TOLLCONST * DBL_EPSILON * log2((double)n);
 }

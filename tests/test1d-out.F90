@@ -12,12 +12,10 @@ program test1d
 
     complex(real64), allocatable  :: a(:), a_out(:)
     integer            :: N, num_args
-    complex(real64)         :: a_in
+    complex(real64), allocatable         :: a_in(:)
     character(len=100) :: args
     character(len=20)  :: exe
     integer            :: plan
-    real(real64)       :: errtol
-
     num_args = command_argument_count()
     if (num_args < 1) then
 
@@ -33,9 +31,7 @@ program test1d
     print*, "before FFT a"
     call dump(a, n)
    
-    a_in = a(n)
-    errtol = geterrtol(real(a_in), n)
-    ! write(6,*) "errtol = ",  errtol
+    a_in = a(1:n)
     call zfft1d(a, n, juffte_init, a_out)
 
     call zfft1d(a, n, juffte_fw, a_out)
@@ -54,7 +50,7 @@ program test1d
     call getarg(0, args)
     read(args, "(A15)") exe
 
-    if (abs((real(a_in) - real(a(n)))/real(a_in)) < errtol) then
+    if (roundtrip_check(a_in, a, n)) then
         print *, exe, "PASS"
 
     else

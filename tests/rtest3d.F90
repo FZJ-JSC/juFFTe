@@ -13,14 +13,11 @@ program rtest3d
     complex(real64), allocatable :: a_c(:)
     real(real32), allocatable    :: a_r32(:)
     complex(real32), allocatable :: a_c_r32(:)
-    real(real64)                 :: a_in
-    real(real32)                 :: a_in_r32
+    real(real64), allocatable                 :: a_in(:)
+    real(real32), allocatable                 :: a_in_r32(:)
     integer                      :: nx, ny, nz, num_args
     character(len=100)           :: args
     character(len=20)            :: exe
-    real(real32)                 :: errtol_r32
-    real(real64)                 :: errtol
-
     num_args = command_argument_count()
     if (num_args < 3) then
 
@@ -48,9 +45,7 @@ allocate (a(nx*ny*nz), a_c(nx*ny*nz))
     print*, "a before FFT."
     call init(a, nx*ny*nz)
     call dump(a, nx*ny*nz)
-    a_in = a(nx*ny*nz)
-    errtol = geterrtol(a_in, nx*ny*nz)
-    ! write(6,*) "errtol = ",  errtol
+    a_in = a(1:nx*ny*nz)
     call dzfft3d(a, a_c, nx, ny, nz, juffte_init)
     call dzfft3d(a, a_c, nx, ny, nz, juffte_fw)
 
@@ -66,7 +61,7 @@ allocate (a(nx*ny*nz), a_c(nx*ny*nz))
     call getarg(0, args)
     read(args, "(A20)") exe
 
-    if (abs((a_in - a(nx*ny*nz))/a_in) < errtol) then
+    if (roundtrip_check(a_in, a, nx*ny*nz)) then
         print *, exe, "PASS"
 
     else
@@ -85,9 +80,7 @@ allocate (a(nx*ny*nz), a_c(nx*ny*nz))
     print*, "a_r32 before FFT."
     call init(a_r32, nx*ny*nz)
     call dump(a_r32, nx*ny*nz)
-    a_in_r32 = a_r32(nx*ny*nz)
-    errtol_r32 = geterrtol(a_in_r32, nx*ny*nz)
-    ! write(6,*) "errtol = ",  errtol_r32
+    a_in_r32 = a_r32(1:nx*ny*nz)
     call dzfft3d(a_r32, a_c_r32, nx, ny, nz, juffte_init)
     call dzfft3d(a_r32, a_c_r32, nx, ny, nz, juffte_fw)
 
@@ -103,7 +96,7 @@ allocate (a(nx*ny*nz), a_c(nx*ny*nz))
     call getarg(0, args)
     read(args, "(A20)") exe
 
-    if (abs((a_in_r32 - a_r32(nx*ny*nz))/a_in_r32) < errtol_r32) then
+    if (roundtrip_check(a_in_r32, a_r32, nx*ny*nz)) then
         print *, exe, "PASS"
 
     else

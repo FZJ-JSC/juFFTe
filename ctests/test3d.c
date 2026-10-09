@@ -5,17 +5,17 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <complex.h>
 #include <math.h>
 #include <float.h>
 #include "../src/juffte.h"
+#include "test_utils.h"
 
 #define NDA 16777216
-#define TOLLCONST 10
 
 void init(double _Complex* a, int n);
 void dump(const double _Complex* a, int n);
-double geterrtol(int n);
 
 int main(int argc, char** argv) {
     int nx, ny, nz;
@@ -47,9 +47,19 @@ int main(int argc, char** argv) {
     // init FFT
     zfft3d_c(a, nx, ny, nz, juffte_init);
 
-    double _Complex a_in = a[n - 1];
-    double errtol = geterrtol(n);
-    // printf("errtol = %e\n", errtol);
+    // Keep the input for the round-trip check.
+
+    double _Complex* a_in = malloc(n * sizeof *a_in);
+
+    if (!a_in) {
+
+        perror("malloc");
+
+        return 1;
+
+    }
+
+    memcpy(a_in, a, n * sizeof *a_in);
 
     // Inverse FFT
     zfft3d_c(a, nx, ny, nz, juffte_fw);
@@ -59,17 +69,18 @@ int main(int argc, char** argv) {
     zfft3d_c(a, nx, ny, nz, juffte_bw);
     dump(a, n);
 
-    double err = cabs(a[n - 1] - a_in) / cabs(a_in);
-
-    if (err < errtol) {
+    if (roundtrip_check_c(a_in, a, n)) {
         printf("%s PASS\n", argv[0]);
     } else {
-        printf("%s FAIL (error = %.3e)\n", argv[0], err);
+        printf("%s FAIL\n", argv[0]);
         free(a);
+        free(a_in);
         return 1;
     }
 
     free(a);
+
+    free(a_in);
     return 0;
 }
 
@@ -83,8 +94,4 @@ void dump(const double _Complex* a, int n) {
     for (int i = 0; i < n; ++i) {
         printf("%4d: %.6f + %.6fi\n", i + 1, creal(a[i]), cimag(a[i]));
     }
-}
-
-double geterrtol(int n) {
-    return TOLLCONST * DBL_EPSILON * log2((double)n);
 }

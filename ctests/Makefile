@@ -46,22 +46,22 @@ endif
 CFLAGS  += $(OMPFLAGS) 
 all: test1d test2d test3d rtest1d rtest2d rtest3d fftw-test fftw-test2d fftw-test3d
 
-test1d : test1d.c  
+test1d : test1d.c test_utils.h
 	$(CC) $(CFLAGS) $< $(LIBFLAGS)  -o $@
 
-test2d : test2d.c 
+test2d : test2d.c test_utils.h
 	$(CC) $(CFLAGS) $< $(LIBFLAGS) -o $@
 
-test3d : test3d.c 
+test3d : test3d.c test_utils.h
 	$(CC) $(CFLAGS) $< $(LIBFLAGS) -o $@
 
-rtest1d : rtest1d.c 
+rtest1d : rtest1d.c test_utils.h
 	$(CC) $(CFLAGS) $< $(LIBFLAGS) -o $@
 
-rtest2d : rtest2d.c 
+rtest2d : rtest2d.c test_utils.h
 	$(CC) $(CFLAGS) $< $(LIBFLAGS) -o $@
 
-rtest3d : rtest3d.c 
+rtest3d : rtest3d.c test_utils.h
 	$(CC) $(CFLAGS) $< $(LIBFLAGS) -o $@
 
 fftw-test : fftw-test.c
