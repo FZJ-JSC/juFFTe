@@ -10,16 +10,13 @@ FCFLAGS = -g -O3
 # -fno-tree-vectorize -fno-openmp-simd  # disable vectorization
 LIBDIR ?= ../src
 INCDIR ?= ../src
-WITHFFTW ?= 0
+WITH_REFERENCE_FFTW ?= 0
 LIBFLAGS = -L $(LIBDIR)  -I $(INCDIR) -ljuffte
-ifeq ($(WITHSPRL), 1)
-    LIBFLAGS = -L $(LIBDIR) -I $(INCDIR) -ljufftesp
-endif
 FCFLAGS1 = 
 OMPFLAGS = -fopenmp
  
-ifeq ($(WITHFFTW), 1)
-    FCFLAGS += -DFFTW
+ifeq ($(WITH_REFERENCE_FFTW), 1)
+    FCFLAGS += -DUSE_REFERENCE_FFTW
 	LIBFLAGS += -lfftw3_omp -lfftw3 -I $(FFTWDIR)/include -I $(FFTWDIR)/lib
 endif
 
@@ -42,7 +39,7 @@ FCFLAGS  += $(OMPFLAGS)
 # -mprefer-vector-width=512
 DEP = bench_utils_m.o  
 
-ifeq ($(WITHFFTW), 1)
+ifeq ($(WITH_REFERENCE_FFTW), 1)
 	DEP += fftw_m.o 
 endif
 

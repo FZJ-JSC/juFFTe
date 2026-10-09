@@ -5,26 +5,19 @@
 
 #ifndef JUFFTE_H
 #define JUFFTE_H
-#define FFTW_ALIGNMENT 32
-#include <stdio.h>
-#include <stdlib.h>
+
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <complex.h>
+#define FFTW_ALIGNMENT 32
 
-int juffte_init =0;
-int juffte_fw = -1;
-int juffte_bw = 1;
+enum { juffte_init = 0, juffte_fw = -1, juffte_bw = 1 };
 
-
-#ifdef FFTW
-typedef double fftw_complex[2];
-#define CLXTYP fftw_complex // double[2]
-#else
-#define CLXTYP double _Complex // native complex
-#endif
+// Native C API. The complex type is layout-compatible with fftw_complex below.
+#define CLXTYP double _Complex
 
 void zfft1d_c(CLXTYP *input, int n, int iopt);
 void zfft1d_out_c(CLXTYP *input, CLXTYP *output, int n, int iopt);
@@ -39,182 +32,58 @@ void zdfft1d_c(CLXTYP *a, double *a_r, int n, int iopt);
 void zdfft2d_c(CLXTYP *a, double *a_r, int nx, int ny, int iopt);
 void zdfft3d_c(CLXTYP *a, double *a_r, int nx, int ny, int nz, int iopt);
 
-// FFTW stuff
+// ----------------------------------------------------------------------------
+// FFTW compatibility layer. Always available; the definitions live in the
+// library, so this header may be included from any number of translation units.
+// It is part of libjuffte -- there is no separate library to link.
+// ----------------------------------------------------------------------------
 
-#ifdef FFTW
+// Matches FFTW's fallback typedef, so in[i][0] / in[i][1] behave as expected.
+typedef double fftw_complex[2];
 
-int FFTW_init = 0;
-int FFTW_FORWARD = -1;
-int FFTW_BACKWARD = 1;
-int FFTW_ESTIMATE = 0;
-int FFTW_MEASURE    = 1;
-int FFTW_PATIENT    = 2;
-int FFTW_EXHAUSTIVE = 3;
+// Values taken from fftw3.h so that flags compare and combine identically.
+#define FFTW_FORWARD (-1)
+#define FFTW_BACKWARD (+1)
+#define FFTW_MEASURE (0U)
+#define FFTW_EXHAUSTIVE (1U << 3)
+#define FFTW_PATIENT (1U << 5)
+#define FFTW_ESTIMATE (1U << 6)
 
-// typedef double fftw_complex[2];
+// Opaque, and a pointer as in FFTW, so that `fftw_plan p = NULL;` compiles.
+typedef struct juffte_plan_s *fftw_plan;
 
+// The entry points carry juffte_ names so that the library exports nothing that
+// clashes with real FFTW; a program can therefore link juFFTe and libfftw3 side
+// by side (the benchmark does). The macros below give source compatibility: code
+// written against FFTW keeps calling fftw_*, and including this header instead of
+// fftw3.h redirects those calls into juFFTe.
+void *juffte_fftw_malloc(size_t n);
+void juffte_fftw_free(void *p);
 
-typedef struct
-{
-    int n;           // length of transform (nx*ny for a 2D plan for example)
-    int rank;        // 1, 2 or 3
-    int nx, ny, nz;      // per-dimension sizes 
-    int dir;
-    int flag;
-    // Buffers (only some are used depending on type)
-    double *r_in;           // R2C input or C2R output
-    fftw_complex *c_in;  // C2C or C2R input
-    fftw_complex *c_out; // C2C or R2C output
-    double *r_out;          // C2R output or R2C input (rare)
+fftw_plan juffte_fftw_plan_dft_1d(int n, fftw_complex *in, fftw_complex *out, int dir, int flag);
+fftw_plan juffte_fftw_plan_dft_2d(int nx, int ny, fftw_complex *in, fftw_complex *out,
+                                  int dir, int flag);
+fftw_plan juffte_fftw_plan_dft_3d(int nx, int ny, int nz, fftw_complex *in, fftw_complex *out,
+                                  int dir, int flag);
 
-    // Derived sizes
-    int complex_len; // n/2 + 1 for R2C/C2R
-} fftw_plan;
+void juffte_fftw_execute(const fftw_plan p);
+void juffte_fftw_execute_dft(const fftw_plan p, fftw_complex *in, fftw_complex *out);
+void juffte_fftw_destroy_plan(fftw_plan p);
 
-void *fftw_malloc(size_t n)
-{
-    void *p = NULL;
-    if (posix_memalign(&p, FFTW_ALIGNMENT, n) != 0)
-        p = NULL;
-    return p;
-}
+void juffte_fft_plan_print(const fftw_plan p); // debug helper, not part of the FFTW API
 
-void fftw_free(void *p)
-{
-    free(p);
-}
-
-fftw_plan fftw_plan_dft_1d(int n, fftw_complex *in, fftw_complex *out, int dir, int flag)
-{
-    fftw_plan p;
-    p.n = n;
-    p.rank = 1;
-    p.c_in = in;
-    p.c_out = out;
-    p.dir = dir;
-    p.flag = flag;
-
-    if (p.c_in == p.c_out)
-        {
-            zfft1d_c(p.c_in, p.n, 0);
-        }
-    else
-        {
-            zfft1d_out_c(p.c_in, p.c_out, p.n, 0);
-        }
-
-    return p;
-}
-
-fftw_plan fftw_plan_dft_2d(int nx, int ny, fftw_complex *in, fftw_complex *out, int dir, int flag)
-{
-    fftw_plan p;
-    p.n = nx * ny;
-    p.rank = 2;
-    p.nx = nx;
-    p.ny = ny;
-    p.c_in = in;
-    p.c_out = out;
-    p.dir = dir;
-    p.flag = flag;
-
-    if (p.c_in == p.c_out)
-        {
-            zfft2d_c(p.c_in, p.nx, p.ny, 0);
-        }
-    else
-        {
-            zfft2d_out_c(p.c_in, p.c_out, p.nx, p.ny, 0);
-        }
-
-    return p;
-}
-
-fftw_plan fftw_plan_dft_3d(int nx, int ny, int nz, fftw_complex *in, fftw_complex *out, int dir, int flag)
-{
-    fftw_plan p;
-    p.n = nx * ny * nz;
-    p.rank = 3;
-    p.nx = nx;
-    p.ny = ny;
-    p.nz = nz;
-    p.c_in = in;
-    p.c_out = out;
-    p.dir = dir;
-    p.flag = flag;
-
-    if (p.c_in == p.c_out)
-    {
-        zfft3d_c(p.c_in, p.nx, p.ny, p.nz, 0);
-    }
-    else
-    {
-        zfft3d_out_c(p.c_in, p.c_out, p.nx, p.ny, p.nz, 0);
-    }
-
-    return p;
-}
-
-void fft_plan_print(fftw_plan p) // for debug
-{
-
-    if (p.c_in == p.c_out)
-    {
-        printf("In place FFT\n");
-    }
-
-    printf("Input array:\n");
-    for (int i = 0; i < p.n; i++)
-        printf("  [%d] = %f + %fi\n", i, p.c_in[i][0], p.c_in[i][1]);
-
-    printf("Output array:\n");
-    for (int i = 0; i < p.n; i++)
-        printf("  [%d] = %f + %fi\n", i, p.c_out[i][0], p.c_out[i][1]);
-}
-
-void fftw_execute(fftw_plan p) // for debug
-{
-    if (p.rank == 3)
-        {
-            if (p.c_in == p.c_out)
-            {
-                zfft3d_c(p.c_in, p.nx, p.ny, p.nz, p.dir);
-            }
-            else
-            {
-                zfft3d_out_c(p.c_in, p.c_out, p.nx, p.ny, p.nz, p.dir);
-            }
-        }
-    else if (p.rank == 2)
-        {
-            if (p.c_in == p.c_out)
-            {
-                zfft2d_c(p.c_in, p.nx, p.ny, p.dir);
-            }
-            else
-            {
-                zfft2d_out_c(p.c_in, p.c_out, p.nx, p.ny, p.dir);
-            }
-        }
-    else
-        {
-            if(p.c_in == p.c_out)
-            {
-                zfft1d_c(p.c_in, p.n, p.dir);
-            }
-            else
-            {
-                zfft1d_out_c(p.c_in, p.c_out, p.n, p.dir);
-            }
-        }
-}
-#endif
-
-
+#define fftw_malloc        juffte_fftw_malloc
+#define fftw_free          juffte_fftw_free
+#define fftw_plan_dft_1d   juffte_fftw_plan_dft_1d
+#define fftw_plan_dft_2d   juffte_fftw_plan_dft_2d
+#define fftw_plan_dft_3d   juffte_fftw_plan_dft_3d
+#define fftw_execute       juffte_fftw_execute
+#define fftw_execute_dft   juffte_fftw_execute_dft
+#define fftw_destroy_plan  juffte_fftw_destroy_plan
+#define fft_plan_print     juffte_fft_plan_print
 
 #ifdef __cplusplus
 }
-}
 #endif
 
-#endif // juffte_H
+#endif // JUFFTE_H

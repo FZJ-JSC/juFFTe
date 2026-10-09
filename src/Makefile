@@ -21,7 +21,6 @@ OMPFLAGS = -fopenmp
 ifeq ($(WITHSPRL), 1)
 	FCFLAGS += -DSPRL
 	SPRLPATH = spiral/c
-	LIBS = libjufftesp.a
 	FILE_EXISTS := $(wildcard spiral/c/dft2c_a.c)
 
 	ifeq ($(WITHSVE), 1)
@@ -60,18 +59,22 @@ FCFLAGS  += $(OMPFLAGS)
 PREFIX ?= /usr/
 
 
-OBJ    = utils_m.o param.o factor_m.o kernel_m.o fft235_m.o  zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o juffte.o
-OBJSP  = utils_m.o param.o factor_m.o kernel_m.o fft235s_m.o zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o juffte.o
+OBJ    = utils_m.o param.o factor_m.o kernel_m.o fft235_m.o  zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o juffte.o juffte_fftw.o
+OBJSP  = utils_m.o param.o factor_m.o kernel_m.o fft235s_m.o zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o juffte.o juffte_fftw.o
 OBJSPC = $(patsubst %.c, %.o, $(notdir $(wildcard $(SPRLPATH)/*.c)))
 
 all: $(LIBS)
 
 install: all
 	mkdir -p $(PREFIX)/lib && mkdir -p $(PREFIX)/include  && cp *.a $(PREFIX)/lib && cp *.mod $(PREFIX)/include && cp *.h $(PREFIX)/include
-libjuffte.a: $(OBJ)
-	ar rcs $@ $(OBJ)
-libjufftesp.a: $(OBJSP) $(OBJSPC)
-	ar rcs $@ $(OBJSP) $(OBJSPC)
+# One library for every backend; the Spiral build only swaps the object list.
+LIBOBJ = $(OBJ)
+ifeq ($(WITHSPRL), 1)
+LIBOBJ = $(OBJSP) $(OBJSPC)
+endif
+
+libjuffte.a: $(LIBOBJ)
+	ar rcs $@ $(LIBOBJ)
 
 param.o : param.F90
 	$(FC) $(FCFLAGS) -c $<
@@ -101,6 +104,9 @@ zdfft3d_m.o : zdfft3d_m.F90 zdfft2d_m.o zfft1d_m.o
 	$(FC) $(FCFLAGS) -I. -c $<
 juffte.o : juffte.F90 zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o utils_m.o
 	$(FC) $(FCFLAGS) -I. -c $<
+juffte_fftw.o : juffte_fftw.c juffte.h
+	$(CC) $(CFLAGS) -c $<
+
 %.o : $(SPRLPATH)/%.c
 	$(CC) $(CFLAGS) -c $< 
 

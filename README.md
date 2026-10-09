@@ -28,7 +28,7 @@ Options:
 | `-DWITHSPRL=ON`           | Spiral kernel backend                       |
 | `-DWITHRVV=ON`            | RISC-V RVV kernels (implies `WITHSPRL`)     |
 | `-DWITHSVE=ON`            | Arm SVE kernels (implies `WITHSPRL`)        |
-| `-DWITHFFTW=ON`           | Build the FFTW comparison into the benchmark|
+| `-DWITH_REFERENCE_FFTW=ON`| Build the comparisons against a reference FFTW|
 | `-DBUILD_SHARED_LIBS=ON`  | Shared instead of static library            |
 
 Only the RVV kernels are currently generated: `-DWITHSVE=ON`, and `-DWITHSPRL=ON` on its
@@ -115,15 +115,29 @@ Edit the Makefile if necessary for your system setup.
 
 ### FFTW API (drop-in compatibility)
 
-| **function**                                             | **Description**                |
-| -------------------------------------------------------- | ------------------------------ |
-| `fftw_malloc(size)`                                      | Allocate aligned memory        |
-| `fftw_plan_dft_1d(n, in, out, sign, flags)`              | Create 1-D FFT plan            |
-| `fftw_execute_dft(plan)`                                 | Execute FFT (C/C++ API)        |
-| `fftw_execute_dft(plan, in, out)`                        | Execute FFT (Fortran API)      |
-| `fftw_free(ptr)`                                         | Free aligned memory            |
+| **function**                                              | **C** | **Fortran** |
+| --------------------------------------------------------- | :---: | :---------: |
+| `fftw_malloc(size)`                                       | yes   | –           |
+| `fftw_free(ptr)`                                          | yes   | –           |
+| `fftw_plan_dft_1d(n, in, out, sign, flags)`               | yes   | yes         |
+| `fftw_plan_dft_2d(nx, ny, in, out, sign, flags)`          | yes   | yes         |
+| `fftw_plan_dft_3d(nx, ny, nz, in, out, sign, flags)`      | yes   | yes         |
+| `fftw_execute(plan)`                                      | yes   | –           |
+| `fftw_execute_dft(plan, in, out)`                         | yes   | yes         |
+| `fftw_destroy_plan(plan)`                                 | yes   | yes         |
 
-See the example files `fftw-test.c` and `fftw-test.F90` in the test folders.
+The layer is always built into `libjuffte` — no build option, macro or extra library. From C,
+include `juffte.h` instead of `fftw3.h`; from Fortran, `use juffte` instead of
+`include 'fftw3.f03'`. Either way, link `-ljuffte` instead of `-lfftw3`.
+
+The C entry points are exported as `juffte_fftw_*` and `juffte.h` maps the `fftw_*` names onto
+them, so juFFTe exports nothing that clashes with real FFTW. A program can therefore link both
+libraries at once — which is how the benchmark compares them.
+
+Known limitation: only one plan can be live at a time. Creating a second plan currently
+fails. See the open issues.
+
+See the example files `fftw-test.c` and `test1d-fftwint.F90` in the test folders.
 
 ### OpenMP
 
@@ -136,8 +150,8 @@ gfortran -fopenmp your_code.f90 -ljuffte
 
 ## Build Code with juFFTe
 
-To use juFFTe, link the library with `-ljuffte`. The Makefile build emits `libjufftesp.a` for the
-Spiral version, so use `-ljufftesp` there; the CMake build always produces `libjuffte`. When using from C/C++, include Fortran runtime libraries, e.g., for GCC:
+To use juFFTe, link the library with `-ljuffte`. There is one library for every backend and for
+both the native and the FFTW-compatible API. When using from C/C++, include Fortran runtime libraries, e.g., for GCC:
 
 ```
 gcc your_code.c -ljuffte -lm -lgfortran

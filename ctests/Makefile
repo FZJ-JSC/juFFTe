@@ -5,22 +5,21 @@
 
 CC ?= gcc
 CFLAGS = -g -O3
-WITHFFTW  ?= 0
+WITH_REFERENCE_FFTW  ?= 0
 # -g -O3 -ftree-vectorize -fopt-info-vec -mavx512f -fopt-info-vec-missed
 # -fno-tree-vectorize -fno-openmp-simd  # disable vectorization
 LIBDIR ?= ../src
 INCDIR ?= ../src
 LIBFLAGS = -L $(LIBDIR)  -I $(INCDIR) -ljuffte -lm -lgfortran
-LIBFLAGSSP = -L $(LIBDIR) -I $(INCDIR) -ljufftesp -lm -lgfortran
+LIBFLAGSSP = -L $(LIBDIR) -I $(INCDIR) -ljuffte -lm -lgfortran
 
 CFLAGS1 = 
 OMPFLAGS = -fopenmp -fopenmp-simd
  
-ifeq ($(WITHFFTW), 1)
+ifeq ($(WITH_REFERENCE_FFTW), 1)
 	FFTWINC ?= /usr/include
 	FFTWLIB ?= /usr/lib
-	FFTWFLAGS = -I $(FFTWINC) -L $(FFTWLIB) -lfftw3 -DWITHFFTW
-	LIBFLAGS = $(FFTWINC FFTWLIB) $(FFTWFLAGS)
+	FFTWFLAGS = -I $(FFTWINC) -L $(FFTWLIB) -lfftw3 -DUSE_REFERENCE_FFTW
 endif
 
 ifneq (,$(filter $(CC),icx icx-cc))
@@ -66,13 +65,13 @@ rtest3d : rtest3d.c
 	$(CC) $(CFLAGS) $< $(LIBFLAGS) -o $@
 
 fftw-test : fftw-test.c
-	$(CC) $(CFLAGS) -DFFTW $< $(LIBFLAGS) -o $@
+	$(CC) $(CFLAGS) $< $(LIBFLAGS) $(FFTWFLAGS) -o $@
 
 fftw-test2d : fftw-test2d.c
-	$(CC) $(CFLAGS) -DFFTW $< $(LIBFLAGS) -o $@
+	$(CC) $(CFLAGS) $< $(LIBFLAGS) $(FFTWFLAGS) -o $@
 
 fftw-test3d : fftw-test3d.c
-	$(CC) $(CFLAGS) -DFFTW $< $(LIBFLAGS) -o $@
+	$(CC) $(CFLAGS) $< $(LIBFLAGS) $(FFTWFLAGS) -o $@
 
 test  :   test1d test2d test3d rtest1d rtest2d rtest3d fftw-test fftw-test2d fftw-test3d
 	./test1d 2 && ./test2d 2 2 && ./test3d 2 2 2 && ./rtest1d 2 && ./rtest2d 2 2 && ./rtest3d 2 2 2 && ./fftw-test 2 && ./fftw-test2d 2 2 && ./fftw-test3d 2 2 2

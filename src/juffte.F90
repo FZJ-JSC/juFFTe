@@ -150,6 +150,22 @@ if (juffte_initialized .eqv. .false. ) then
                 call zfft1d(input, fftw_size, fftw_dir, output)
                 endif
             endif
+
+        ! juFFTe scales the backward transform by 1/n, FFTW does not. Undo it so
+        ! that ported FFTW code sees FFTW's convention.
+        ! TODO: dirty fix. Settle the normalisation convention in the library instead.
+        if (fftw_dir == FFTW_BACKWARD) then
+            if (fftw_rank == 3) then
+                fftw_size = fftw_nx*fftw_ny*fftw_nz
+            elseif (fftw_rank == 2) then
+                fftw_size = fftw_nx*fftw_ny
+            end if
+            if (same(input, output)) then
+                input(1:fftw_size) = input(1:fftw_size)*dble(fftw_size)
+            else
+                output(1:fftw_size) = output(1:fftw_size)*dble(fftw_size)
+            end if
+        end if
         end subroutine fftw_execute_dft
 
         subroutine fftw_destroy_plan(pln)

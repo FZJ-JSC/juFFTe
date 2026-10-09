@@ -5,10 +5,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#ifdef WITHFFTW
+#ifdef USE_REFERENCE_FFTW
 #include <fftw3.h>
 #endif
-#ifndef WITHFFTW
+#ifndef USE_REFERENCE_FFTW
 #include <juffte.h>
 #endif
 
