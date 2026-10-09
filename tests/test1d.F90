@@ -12,11 +12,10 @@ program test1d
     complex(real64), allocatable    :: a(:)
     complex(real32), allocatable    :: a_32(:)
     integer            :: N, num_args
-    complex(real64)         :: a_in
-    complex(real32)         :: a_32_in
+    complex(real64), allocatable         :: a_in(:)
+    complex(real32), allocatable         :: a_32_in(:)
     character(len=100) :: args
     character(len=20)  :: exe
-
     num_args = command_argument_count()
     if (num_args < 1) then
 
@@ -30,12 +29,12 @@ program test1d
     write(6, *) " "
     write(6, *) " Running FP64 test..."
     write(6, *) " "
-
+    
     allocate(a(n))
 
     call init(a, n)
     call dump(a, n)
-    a_in = a(n)
+    a_in = a(1:n)
     call zfft1d(a, n, juffte_init)
 
     call zfft1d(a, n, juffte_fw)
@@ -47,7 +46,7 @@ program test1d
     call getarg(0, args)
     read(args, "(A10)") exe
 
-    if (abs(dble(a_in) - dble(a(n))) < errtol) then
+    if (roundtrip_check(a_in, a, n)) then
         print *, exe, "PASS"
 
     else
@@ -65,7 +64,7 @@ program test1d
 
     call init(a_32, n)
     call dump(a_32, n)
-    a_32_in = a_32(n)
+    a_32_in = a_32(1:n)
     call zfft1d(a_32, n, juffte_init)
 
     call zfft1d(a_32, n, juffte_fw)
@@ -75,7 +74,7 @@ program test1d
     call dump(a_32, n)
 
 
-    if (abs(real(a_32_in) - real(a_32(n))) < errtol_r32) then
+    if (roundtrip_check(a_32_in, a_32, n)) then
         print *, exe, "PASS"
 
     else

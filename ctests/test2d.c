@@ -8,10 +8,11 @@
 #include <complex.h>
 #include <string.h>
 #include <math.h>
-#include "../src/juffte.h"  
+#include <float.h>
+#include "../src/juffte.h"
+#include "test_utils.h"
 
 #define NDA 16777216
-#define TOL 1e-12
 
 void init(double _Complex* a, int n);
 void dump(const double _Complex* a, int n);
@@ -50,9 +51,13 @@ int main(int argc, char** argv) {
 
     // Init FFT
     zfft2d_c(a, nx, ny, juffte_init);
-
-    // Save last value
-    double _Complex a_in = a[n - 1];
+    // Keep the input for the round-trip check.
+    double _Complex* a_in = malloc(n * sizeof *a_in);
+    if (!a_in) {
+        perror("malloc");
+        return 1;
+    }
+    memcpy(a_in, a, n * sizeof *a_in);
 
     // Forward FFT
     zfft2d_c(a, nx, ny, juffte_fw);
@@ -61,19 +66,20 @@ int main(int argc, char** argv) {
     // Inverse FFT again
     zfft2d_c(a, nx, ny, juffte_bw);
     dump(a, n);
-
-    double err = cabs(a[n - 1] - a_in);
     const char* exe = argv[0];
 
-    if (err < TOL) {
+    if (roundtrip_check_c(a_in, a, n)) {
         printf("%s PASS\n", exe);
     } else {
-        printf("%s FAIL (error = %.2e)\n", exe, err);
+        printf("%s FAIL\n", exe);
         free(a);
+        free(a_in);
         return 1;
     }
 
     free(a);
+
+    free(a_in);
     return 0;
 }
 

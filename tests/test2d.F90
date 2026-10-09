@@ -12,12 +12,11 @@ program test2d
 
     complex(real64),allocatable :: a(:)
     complex(real32),allocatable :: a_32(:)
-    complex(real64)             :: a_in
-    complex(real32)             :: a_32_in
+    complex(real64), allocatable             :: a_in(:)
+    complex(real32), allocatable             :: a_32_in(:)
     integer                     :: nx, ny, num_args
     character(len=100)          :: args
     character(len=20)           :: exe
-
     num_args = command_argument_count()
     if (num_args < 2) then
 
@@ -41,7 +40,7 @@ program test2d
     call init(a, nx*ny)
     call dump(a, nx*ny)
     call zfft2d(a, nx, ny, juffte_init)
-    a_in = a(nx*ny)
+    a_in = a(1:nx*ny)
 
     call zfft2d(a, nx, ny, juffte_fw)
     call dump(a, nx*ny)
@@ -52,7 +51,7 @@ program test2d
     call getarg(0, args)
     read(args, "(A10)") exe
 
-    if (abs(dble(a_in) - dble(a(nx*ny))) < errtol) then
+    if (roundtrip_check(a_in, a, nx*ny)) then
         print *, exe, "PASS"
 
     else
@@ -70,7 +69,7 @@ program test2d
     call init(a_32, nx*ny)
     call dump(a_32, nx*ny)
     call zfft2d(a_32, nx, ny, juffte_init)
-    a_32_in = a_32(nx*ny)
+    a_32_in = a_32(1:nx*ny)
 
     call zfft2d(a_32, nx, ny, juffte_fw)
     call dump(a_32, nx*ny)
@@ -79,7 +78,7 @@ program test2d
     call dump(a_32, nx*ny)
 
 
-    if (abs(real(a_32_in) - real(a_32(nx*ny))) < errtol_r32) then
+    if (roundtrip_check(a_32_in, a_32, nx*ny)) then
         print *, exe, "PASS"
 
     else

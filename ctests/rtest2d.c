@@ -8,7 +8,9 @@
 #include <string.h>
 #include <math.h>
 #include <complex.h>
+#include <float.h>
 #include "../src/juffte.h"
+#include "test_utils.h"
 
 #define NDA 16777216
 
@@ -21,7 +23,7 @@ int main(int argc, char **argv) {
     static double _Complex a_c[NDA], b_c[NDA];
 
     int nx, ny;
-    double a_in;
+    static double a_in[NDA];
     char exe[20];
 
     if (argc < 3) {
@@ -35,7 +37,7 @@ int main(int argc, char **argv) {
     }
 
     init(a, nx * ny);
-    a_in = a[nx * ny - 1];  // C is 0-based
+    memcpy(a_in, a, (nx * ny) * sizeof a[0]);  // keep the input for the round-trip check
 
 
     dzfft2d_c(a, a_c, nx, ny, juffte_init);
@@ -50,7 +52,7 @@ int main(int argc, char **argv) {
     strncpy(exe, argv[0], sizeof(exe) - 1);
     exe[sizeof(exe) - 1] = '\0';
 
-    if (fabs(a_in - a[nx * ny - 1]) < 1e-15) {
+    if (roundtrip_check_r(a_in, a, nx * ny)) {
         printf("%s PASS\n", exe);
     } else {
         printf("%s FAIL\n", exe);

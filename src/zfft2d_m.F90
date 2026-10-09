@@ -173,7 +173,7 @@ subroutine zfft2d_32(a, nx, ny, iopt, out)
     complex(real32), intent(inout)         :: a(*)
     complex(real32), optional, intent(out) :: out(*)
     integer, intent(in)                    :: nx, ny, iopt
-    complex(real32)                        :: wx(NDA2), wy(NDA2),  c(NDA2)
+    complex(real32), save                  :: wx(NDA2), wy(NDA2),  c(NDA2)
 #ifdef SPRL
     integer, save                          :: lnx(16), lny(16)
 #else 

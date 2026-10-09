@@ -13,12 +13,11 @@ program rtest2d
     complex(real64), allocatable :: a_c(:)
     real(real32), allocatable    :: a_r32(:)
     complex(real32), allocatable :: a_c_r32(:)
-    real(real64)                 :: a_in
-    real(real32)                 :: a_in_r32
+    real(real64), allocatable                 :: a_in(:)
+    real(real32), allocatable                 :: a_in_r32(:)
     integer                      :: nx, ny, num_args
     character(len=100)           :: args
     character(len=20)            :: exe
-
     num_args = command_argument_count()
     if (num_args < 2) then
 
@@ -42,7 +41,7 @@ allocate (a(nx*ny), a_c(nx*ny))
     print*, "a before FFT."
     call init(a, nx*ny)
     call dump(a, nx*ny)
-    a_in = a(nx*ny)
+    a_in = a(1:nx*ny)
     call dzfft2d(a, a_c, nx, ny, juffte_init)
     call dzfft2d(a, a_c, nx, ny, juffte_fw)
 
@@ -58,7 +57,7 @@ allocate (a(nx*ny), a_c(nx*ny))
     call getarg(0, args)
     read(args, "(A20)") exe
 
-    if (abs(a_in - a(nx*ny)) < errtol) then
+    if (roundtrip_check(a_in, a, nx*ny)) then
         print *, exe, "PASS"
 
     else
@@ -77,7 +76,7 @@ allocate (a(nx*ny), a_c(nx*ny))
     print*, "a_r32 before FFT."
     call init(a_r32, nx*ny)
     call dump(a_r32, nx*ny)
-    a_in_r32 = a_r32(nx*ny)
+    a_in_r32 = a_r32(1:nx*ny)
     call dzfft2d(a_r32, a_c_r32, nx, ny, juffte_init)
     call dzfft2d(a_r32, a_c_r32, nx, ny, juffte_fw)
 
@@ -93,7 +92,7 @@ allocate (a(nx*ny), a_c(nx*ny))
     call getarg(0, args)
     read(args, "(A20)") exe
 
-    if (abs(a_in_r32 - a_r32(nx*ny)) < errtol_r32) then
+    if (roundtrip_check(a_in_r32, a_r32, nx*ny)) then
         print *, exe, "PASS"
 
     else

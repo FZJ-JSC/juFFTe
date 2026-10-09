@@ -14,8 +14,7 @@ program test2d_out
     integer                      :: nx, ny, num_args
     character(len=100)           :: args
     character(len=20)            :: exe
-    complex(real64)              :: a_in
-
+    complex(real64), allocatable              :: a_in(:)
     num_args = command_argument_count()
     if (num_args < 2) then
 
@@ -35,7 +34,7 @@ program test2d_out
     print*, "before FFT a"
     call dump(a, nx*ny)
 
-    a_in = a(nx*ny)
+    a_in = a(1:nx*ny)
     call zfft2d(a, nx, ny, juffte_init, a_out)
 
     call zfft2d(a, nx, ny, juffte_fw, a_out)
@@ -51,7 +50,7 @@ program test2d_out
     call getarg(0, args)
     read(args, "(A15)") exe
 
-    if (abs(real(a_in) - real(a(nx*ny))) < errtol) then
+    if (roundtrip_check(a_in, a, nx*ny)) then
         print *, exe, "PASS"
 
     else

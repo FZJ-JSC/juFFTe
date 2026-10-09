@@ -11,13 +11,11 @@ program test3d
     implicit none
     complex(real64), allocatable :: a(:)
     complex(real32), allocatable :: a_32(:)
-    complex(real64) :: a_in
-    complex(real32) :: a_32_in
+    complex(real64), allocatable :: a_in(:)
+    complex(real32), allocatable :: a_32_in(:)
     integer :: nx, ny, nz, num_args
     character(len=100) :: args
     character(len=20) :: exe
-
-
     num_args = command_argument_count()
     if (num_args < 3) then
 
@@ -45,7 +43,7 @@ program test3d
     call init(a, nx*ny*nz)
     call dump(a, nx*ny*nz)
     call zfft3d(a, nx, ny, nz, juffte_init)
-    a_in = a(nx*ny*nz)
+    a_in = a(1:nx*ny*nz)
 
     call zfft3d(a, nx, ny, nz, juffte_fw)
     call dump(a, nx*ny*nz)
@@ -56,7 +54,7 @@ program test3d
     call getarg(0, args)
     read(args, "(A10)") exe
 
-    if (abs(dble(a_in) - dble(a(nx*ny*nz))) < errtol) then
+    if (roundtrip_check(a_in, a, nx*ny*nz)) then
         print *, exe, "PASS"
 
     else
@@ -74,7 +72,7 @@ program test3d
     call init(a_32, nx*ny*nz)
     call dump(a_32, nx*ny*nz)
     call zfft3d(a_32, nx, ny, nz, juffte_init)
-    a_32_in = a_32(nx*ny*nz)
+    a_32_in = a_32(1:nx*ny*nz)
 
     call zfft3d(a_32, nx, ny, nz, juffte_fw)
     call dump(a_32, nx*ny*nz)
@@ -83,7 +81,7 @@ program test3d
     call dump(a_32, nx*ny*nz)
 
 
-    if (abs(real(a_32_in) - real(a_32(nx*ny*nz))) < errtol_r32) then
+    if (roundtrip_check(a_32_in, a_32, nx*ny*nz)) then
         print *, exe, "PASS"
 
     else

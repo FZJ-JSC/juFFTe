@@ -17,11 +17,10 @@ program test2d
 #endif
     complex(real64),allocatable    :: a(:), a_out(:)
     integer                   :: nx, ny, n, num_args
-    complex(real64)                :: a_in
+    complex(real64), allocatable                :: a_in(:)
     character(len=100)        :: args
     character(len=20)         :: exe
     type(C_PTR)               :: plan
-
     num_args = command_argument_count()
     if (num_args < 2) then
 
@@ -42,7 +41,7 @@ program test2d
     print*, "before FFT a"
     call dump(a, n)
 
-    a_in = a(n)
+    a_in = a(1:n)
     plan = fftw_plan_dft_2d(nx, ny, a, a_out, FFTW_FORWARD, FFTW_ESTIMATE)
    call fftw_execute_dft(plan, a, a_out)
     call fftw_destroy_plan(plan)
@@ -58,7 +57,7 @@ program test2d
     call getarg(0, args)
     read(args, "(A20)") exe
 
-    if (abs(real(a_in) - real(a(n))) < errtol) then
+    if (roundtrip_check(a_in, a, n)) then
         print *, exe, "PASS"
 
     else

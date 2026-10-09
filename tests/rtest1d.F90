@@ -13,12 +13,11 @@ program rtest1d
     complex(real64), allocatable :: a_c(:)
     real(real32), allocatable    :: a_r32(:)
     complex(real32), allocatable :: a_c_r32(:)
-    real(real64)                 :: a_in
-    real(real32)                 :: a_in_r32
+    real(real64), allocatable                 :: a_in(:)
+    real(real32), allocatable                 :: a_in_r32(:)
     integer                      :: n, num_args
     character(len=100)           :: args
     character(len=20)            :: exe
-
     num_args = command_argument_count()
     if (num_args < 1) then
 
@@ -38,7 +37,7 @@ allocate (a(n), a_c(n))
     print*, "a befor FFT."
     call init(a, n)
     call dump(a, n)
-    a_in = a(n)
+    a_in = a(1:n)
     call dzfft1d(a, a_c, n, juffte_init)
     call dzfft1d(a, a_c, n, juffte_fw)
 
@@ -54,7 +53,7 @@ allocate (a(n), a_c(n))
     call getarg(0, args)
     read(args, "(A15)") exe
 
-    if (abs(a_in - a(n)) < errtol) then
+    if (roundtrip_check(a_in, a, n)) then
         print *, exe, "PASS"
 
     else
@@ -73,7 +72,7 @@ allocate (a(n), a_c(n))
     print*, "a_r32 befor FFT."
     call init(a_r32, n)
     call dump(a_r32, n)
-    a_in_r32 = a_r32(n)
+    a_in_r32 = a_r32(1:n)
     call dzfft1d(a_r32, a_c_r32, n, juffte_init)
     call dzfft1d(a_r32, a_c_r32, n, juffte_fw)
 
@@ -89,7 +88,7 @@ allocate (a(n), a_c(n))
     call getarg(0, args)
     read(args, "(A15)") exe
 
-    if (abs(a_in_r32 - a_r32(n)) < errtol_r32) then
+    if (roundtrip_check(a_in_r32, a_r32, n)) then
         print *, exe, "PASS"
 
     else

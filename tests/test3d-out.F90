@@ -14,8 +14,7 @@ program test3d_out
     integer                      :: nx, ny, nz, num_args
     character(len=100)           :: args
     character(len=20)            :: exe
-    complex(real64)              :: a_in
-
+    complex(real64), allocatable              :: a_in(:)
     num_args = command_argument_count()
     if (num_args < 3) then
 
@@ -30,7 +29,7 @@ program test3d_out
         read(args, "(I10)") nx
         call getarg(2, args)
         read(args, "(I10)") ny
-        call getarg(2, args)
+        call getarg(3, args)
         read(args, "(I10)") nz
     end if
 
@@ -39,7 +38,7 @@ program test3d_out
     print*, "before FFT a"
     call dump(a, nx*ny*nz)
 
-    a_in = a(nx*ny*nz)
+    a_in = a(1:nx*ny*nz)
     call zfft3d(a, nx, ny, nz, juffte_init, a_out)
 
     call zfft3d(a, nx, ny, nz, juffte_fw, a_out)
@@ -55,7 +54,7 @@ program test3d_out
     call getarg(0, args)
     read(args, "(A15)") exe
 
-    if (abs(real(a_in) - real(a(nx*ny*nz))) < errtol) then
+    if (roundtrip_check(a_in, a, nx*ny*nz)) then
         print *, exe, "PASS"
 
     else
