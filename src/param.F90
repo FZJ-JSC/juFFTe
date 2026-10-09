@@ -32,9 +32,10 @@ integer, parameter       :: juffte_init = 0
 ! FFTW interface
 integer, parameter       :: FFTW_FORWARD    = -1
 integer, parameter       :: FFTW_BACKWARD   = 1
-integer, parameter       :: FFTW_ESTIMATE   = 0
-integer, parameter       :: FFTW_MEASURE    = 1 
-integer, parameter       :: FFTW_PATIENT    = 2
-integer, parameter       :: FFTW_EXHAUSTIVE = 3
+! Values taken from fftw3.h so that flags compare and combine identically.
+integer, parameter       :: FFTW_MEASURE    = 0
+integer, parameter       :: FFTW_EXHAUSTIVE = 8
+integer, parameter       :: FFTW_PATIENT    = 32
+integer, parameter       :: FFTW_ESTIMATE   = 64
 
 end module param
