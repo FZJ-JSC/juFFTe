@@ -120,11 +120,14 @@ Edit the Makefile if necessary for your system setup.
 | `fftw_malloc(size)`                                       | yes   | –           |
 | `fftw_free(ptr)`                                          | yes   | –           |
 | `fftw_plan_dft_1d(n, in, out, sign, flags)`               | yes   | yes         |
-| `fftw_plan_dft_2d(nx, ny, in, out, sign, flags)`          | yes   | yes         |
-| `fftw_plan_dft_3d(nx, ny, nz, in, out, sign, flags)`      | yes   | yes         |
+| `fftw_plan_dft_2d(n0, n1, in, out, sign, flags)`          | yes   | yes         |
+| `fftw_plan_dft_3d(n0, n1, n2, in, out, sign, flags)`      | yes   | yes         |
 | `fftw_execute(plan)`                                      | yes   | –           |
 | `fftw_execute_dft(plan, in, out)`                         | yes   | yes         |
 | `fftw_destroy_plan(plan)`                                 | yes   | yes         |
+
+As in FFTW, dimensions are given slowest first: from C, `n1` (or `n2`) is the contiguous one;
+from Fortran, an array `a(nx, ny)` is planned as `fftw_plan_dft_2d(ny, nx, ...)`.
 
 The layer is always built into `libjuffte` — no build option, macro or extra library. From C,
 include `juffte.h` instead of `fftw3.h`; from Fortran, `use juffte` instead of

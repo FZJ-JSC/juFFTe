@@ -61,9 +61,9 @@ void *juffte_fftw_malloc(size_t n);
 void juffte_fftw_free(void *p);
 
 fftw_plan juffte_fftw_plan_dft_1d(int n, fftw_complex *in, fftw_complex *out, int dir, int flag);
-fftw_plan juffte_fftw_plan_dft_2d(int nx, int ny, fftw_complex *in, fftw_complex *out,
+fftw_plan juffte_fftw_plan_dft_2d(int n0, int n1, fftw_complex *in, fftw_complex *out,
                                   int dir, int flag);
-fftw_plan juffte_fftw_plan_dft_3d(int nx, int ny, int nz, fftw_complex *in, fftw_complex *out,
+fftw_plan juffte_fftw_plan_dft_3d(int n0, int n1, int n2, fftw_complex *in, fftw_complex *out,
                                   int dir, int flag);
 
 void juffte_fftw_execute(const fftw_plan p);
