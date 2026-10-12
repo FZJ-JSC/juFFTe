@@ -345,7 +345,7 @@ if (present(out)) then ! out of place
                 do i = ii, min(ii + NBLK - 1, nx)
 !DIR$ VECTOR ALIGNED
                     do j = jj, min(jj + NBLK - 1, ny)
-                        by(j, i - ii + 1) = a(i, j, k)
+                        by(j, i - ii + 1) = out(i, j, k)
                     end do
                 end do
             end do
