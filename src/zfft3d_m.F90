@@ -54,12 +54,21 @@ subroutine zfft3d_64(a, nx, ny, nz, iopt, out)
         return
     end if
 
+    ! Out of place, conjugate into out and transform that in place, so a is not modified.
     if (iopt == juffte_bw) then
+        if (present(out)) then
 !$OMP PARALLEL DO
 !DIR$ VECTOR ALIGNED
-        do i = 1, nx*ny*nz
-            a(i) = dconjg(a(i))
-        end do
+            do i = 1, nx*ny*nz
+                out(i) = dconjg(a(i))
+            end do
+        else
+!$OMP PARALLEL DO
+!DIR$ VECTOR ALIGNED
+            do i = 1, nx*ny*nz
+                a(i) = dconjg(a(i))
+            end do
+        end if
     end if
 #ifndef SPRL
     call factor(nx, lnx)
@@ -67,9 +76,13 @@ subroutine zfft3d_64(a, nx, ny, nz, iopt, out)
     call factor(nz, lnz)
 #endif
 
-    if (present(out)) then
+    if (present(out) .and. iopt /= juffte_bw) then
 !$OMP PARALLEL PRIVATE(B,C)
         call zfft3d0_64(a, b, b, c, wx, wy, wz, nx, ny, nz, lnx, lny, lnz, out)
+!$OMP END PARALLEL
+    else if (present(out)) then
+!$OMP PARALLEL PRIVATE(B,C)
+        call zfft3d0_64(out, b, b, c, wx, wy, wz, nx, ny, nz, lnx, lny, lnz)
 !$OMP END PARALLEL
     else
 !$OMP PARALLEL PRIVATE(B,C)
@@ -237,21 +250,34 @@ subroutine zfft3d_32(a, nx, ny, nz, iopt, out)
         return
     end if
 
+    ! Out of place, conjugate into out and transform that in place, so a is not modified.
     if (iopt == juffte_bw) then
+        if (present(out)) then
 !$OMP PARALLEL DO
 !DIR$ VECTOR ALIGNED
-        do i = 1, nx*ny*nz
-            a(i) = conjg(a(i))
-        end do
+            do i = 1, nx*ny*nz
+                out(i) = conjg(a(i))
+            end do
+        else
+!$OMP PARALLEL DO
+!DIR$ VECTOR ALIGNED
+            do i = 1, nx*ny*nz
+                a(i) = conjg(a(i))
+            end do
+        end if
     end if
 #ifndef SPRL
     call factor(nx, lnx)
     call factor(ny, lny)
     call factor(nz, lnz)
 #endif
-    if (present(out)) then
+    if (present(out) .and. iopt /= juffte_bw) then
 !$OMP PARALLEL PRIVATE(B,C)
         call zfft3d0_32(a, b, b, c, wx, wy, wz, nx, ny, nz, lnx, lny, lnz, out)
+!$OMP END PARALLEL
+    else if (present(out)) then
+!$OMP PARALLEL PRIVATE(B,C)
+        call zfft3d0_32(out, b, b, c, wx, wy, wz, nx, ny, nz, lnx, lny, lnz)
 !$OMP END PARALLEL
     else
 !$OMP PARALLEL PRIVATE(B,C)
