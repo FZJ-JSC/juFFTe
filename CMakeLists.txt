@@ -16,6 +16,7 @@ option(WITHSPRL "Build with Spiral backend" OFF)
 option(WITHSVE "Build with SVE backend" OFF)
 option(WITHRVV "Build with RVV backend" OFF)
 option(WITH_REFERENCE_FFTW "Build the comparisons against a reference FFTW" OFF)
+option(BUILD_EXAMPLES "Build the example programs in examples/" ON)
 
 # =========================
 # Validate options
@@ -30,7 +31,8 @@ if(WITHRVV AND NOT WITHSPRL)
     set(WITHSPRL ON)
 endif()
 
-# FFTW is optional, used only by the benchmark comparison. No FindFFTW module exists.
+# FFTW is optional: the tests use it as their reference, and the benchmark compares
+# against it. No FindFFTW module exists.
 if(WITH_REFERENCE_FFTW)
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND)
@@ -45,13 +47,14 @@ if(WITH_REFERENCE_FFTW)
         HINTS ${FFTW_LIBRARY_DIRS} ${FFTW_LIBDIR}
     )
 
-    if(FFTW_FOUND AND FFTW_OMP_LIBRARY)
+    if(FFTW_FOUND)
         message(STATUS "FFTW found (${FFTW_VERSION}): enabling FFTW support")
-        message(STATUS "FFTW threading library: ${FFTW_OMP_LIBRARY}")
-    elseif(FFTW_FOUND)
-        message(WARNING "FFTW found but neither fftw3_omp nor fftw3_threads was; "
-                        "FFTW support will be disabled.")
-        set(WITH_REFERENCE_FFTW OFF)
+        if(FFTW_OMP_LIBRARY)
+            message(STATUS "FFTW threading library: ${FFTW_OMP_LIBRARY}")
+        else()
+            message(WARNING "Neither fftw3_omp nor fftw3_threads found; "
+                            "the benchmark will not compare against FFTW.")
+        endif()
     else()
         message(WARNING "FFTW not found. FFTW support will be disabled.")
         set(WITH_REFERENCE_FFTW OFF)
@@ -271,7 +274,7 @@ add_executable(fftbench
 )
 target_link_libraries(fftbench PRIVATE ${LIB_TARGET})
 
-if(WITH_REFERENCE_FFTW AND FFTW_FOUND)
+if(WITH_REFERENCE_FFTW AND FFTW_OMP_LIBRARY)
     target_sources(fftbench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/benchmark/fftw_m.F90)
     target_link_libraries(fftbench PRIVATE ${FFTW_OMP_LIBRARY} PkgConfig::FFTW)
     target_compile_definitions(fftbench PRIVATE USE_REFERENCE_FFTW)
@@ -283,106 +286,97 @@ endif()
 # =========================
 enable_testing()
 
-set(JUFFTE_TEST_TARGETS "")
-set(JUFFTE_TESTS "")
+# One program per language, tests/c/juffte_test.c and tests/fortran/juffte_test.F90,
+# checks one transform per run against FFTW (WITH_REFERENCE_FFTW) or else a direct DFT.
+add_executable(juffte_test_c ${CMAKE_CURRENT_SOURCE_DIR}/tests/c/juffte_test.c)
+target_link_libraries(juffte_test_c PRIVATE ${LIB_TARGET} m)
+if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    target_link_libraries(juffte_test_c PRIVATE gfortran)
+endif()
 
-# Lengths the round-trip tests run at. Length 2 alone never needs a second radix-3
-# stage (9), radix 5 (100), every radix (120) or a non-square shape, which is how the
-# single-precision fft3b constant fixed in e253422 went unnoticed. The six-step branch
-# (1-D n > 174762) is not covered yet: it crashes at the default 8 MB stack, and its
-# out-of-place backward and 1-D r2c paths are broken.
+add_executable(juffte_test_f ${CMAKE_CURRENT_SOURCE_DIR}/tests/fortran/juffte_test.F90)
+target_link_libraries(juffte_test_f PRIVATE ${LIB_TARGET})
+
+if(WITH_REFERENCE_FFTW)
+    foreach(t juffte_test_c juffte_test_f)
+        target_link_libraries(${t} PRIVATE PkgConfig::FFTW)
+        target_compile_definitions(${t} PRIVATE USE_REFERENCE_FFTW)
+    endforeach()
+endif()
+
+# Length 2 alone never needs a second radix-3 stage (9), radix 5 (100), every radix
+# (120) or a non-square shape, which is how the single-precision fft3b constant fixed
+# in e253422 went unnoticed. 20x60 keeps 2-D radix 5 below the direct DFT's N < 4000. The six-step branch (1-D n > 174762) is not covered yet:
+# it crashes at the default 8 MB stack, and its out-of-place backward and 1-D r2c
+# paths are broken.
 set(JUFFTE_SIZES_1D "2" "9" "96" "100" "120" "1024")
-set(JUFFTE_SIZES_2D "2 2" "9 96" "96 64" "120 100" "256 256")
+set(JUFFTE_SIZES_2D "2 2" "9 96" "20 60" "96 64" "120 100" "256 256")
 set(JUFFTE_SIZES_3D "2 2 2" "9 16 20" "12 18 20" "32 32 32")
 
-# One CTest case per size, named <target>_<size>, e.g. test2d_9x96. Each size runs in
-# its own process: initialising a second size in one process hits the single-plan limit.
-function(juffte_add_test_sizes target)
-    foreach(size IN LISTS ARGN)
-        string(REPLACE " " ";" args "${size}")
-        string(REPLACE " " "x" tag "${size}")
-        add_test(NAME ${target}_${tag} COMMAND ${target} ${args})
-        list(APPEND JUFFTE_TESTS ${target}_${tag})
-    endforeach()
-    set(JUFFTE_TESTS ${JUFFTE_TESTS} PARENT_SCOPE)
-endfunction()
-
-# C tests; juffte.h comes from the library's public include directories.
-function(juffte_add_c_test name source)
-    add_executable(${name} ${CMAKE_CURRENT_SOURCE_DIR}/${source})
-    target_link_libraries(${name} PRIVATE ${LIB_TARGET} m)
-    juffte_add_test_sizes(${name} ${ARGN})
-    set(JUFFTE_TESTS ${JUFFTE_TESTS} PARENT_SCOPE)
-    set(JUFFTE_TEST_TARGETS ${JUFFTE_TEST_TARGETS} ${name} PARENT_SCOPE)
-endfunction()
-
-# These exercise the FFTW shim, which is always built into the library.
-function(juffte_add_fftw_test name source)
-    juffte_add_c_test(${name} ${source} ${ARGN})
-    if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-        target_link_libraries(${name} PRIVATE gfortran)
+# One case per process, named like f_real_bw_9x96 or c_complex_fw_1024_fftw: a second
+# size in one process hits the single-plan limit. Without FFTW, sizes with N >= 4000
+# have no reference and are reported as skipped (exit status 77).
+function(juffte_add_test lang type dir size)
+    string(REPLACE " " ";" n "${size}")
+    string(REPLACE " " "x" tag "${size}")
+    set(name ${lang}_${type}_${dir}_${tag})
+    if(ARGN)
+        list(GET ARGN 1 api)
+        set(name ${name}_${api})
     endif()
-    set(JUFFTE_TESTS ${JUFFTE_TESTS} PARENT_SCOPE)
-    set(JUFFTE_TEST_TARGETS ${JUFFTE_TEST_TARGETS} PARENT_SCOPE)
+    add_test(NAME ${name} COMMAND juffte_test_${lang} -t ${type} -d ${dir} ${ARGN} ${n})
+    # Do not add PASS_REGULAR_EXPRESSION: it makes CTest ignore the exit status and
+    # report failures as passes.
+    set_tests_properties(${name} PROPERTIES SKIP_RETURN_CODE 77 FAIL_REGULAR_EXPRESSION "FAIL")
 endfunction()
 
-juffte_add_c_test(ctest1d  ctests/test1d.c  ${JUFFTE_SIZES_1D})
-juffte_add_c_test(ctest2d  ctests/test2d.c  ${JUFFTE_SIZES_2D})
-juffte_add_c_test(ctest3d  ctests/test3d.c  ${JUFFTE_SIZES_3D})
-juffte_add_c_test(crtest1d ctests/rtest1d.c ${JUFFTE_SIZES_1D})
-juffte_add_c_test(crtest2d ctests/rtest2d.c ${JUFFTE_SIZES_2D})
-juffte_add_c_test(crtest3d ctests/rtest3d.c ${JUFFTE_SIZES_3D})
-
-# These print their output but check nothing, so more sizes would add no coverage.
-juffte_add_fftw_test(fftw-test   ctests/fftw-test.c   "2")
-juffte_add_fftw_test(fftw-test2d ctests/fftw-test2d.c "2 2")
-juffte_add_fftw_test(fftw-test3d ctests/fftw-test3d.c "2 2 2")
-
-# Fortran tests
-add_library(test_utils_m_obj OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_utils_m.F90)
-
-function(juffte_add_fortran_test name source)
-    add_executable(${name}
-        ${CMAKE_CURRENT_SOURCE_DIR}/${source}
-        $<TARGET_OBJECTS:test_utils_m_obj>
-    )
-    target_link_libraries(${name} PRIVATE ${LIB_TARGET})
-    juffte_add_test_sizes(${name} ${ARGN})
-    set(JUFFTE_TESTS ${JUFFTE_TESTS} PARENT_SCOPE)
-    set(JUFFTE_TEST_TARGETS ${JUFFTE_TEST_TARGETS} ${name} PARENT_SCOPE)
-endfunction()
-
-juffte_add_fortran_test(test1d         tests/test1d.F90         ${JUFFTE_SIZES_1D})
-juffte_add_fortran_test(test1d-out     tests/test1d-out.F90     ${JUFFTE_SIZES_1D})
-juffte_add_fortran_test(test1dni       tests/test1dni.F90       ${JUFFTE_SIZES_1D})
-juffte_add_fortran_test(test1d-fftwint tests/test1d-fftwint.F90 ${JUFFTE_SIZES_1D})
-juffte_add_fortran_test(test2d         tests/test2d.F90         ${JUFFTE_SIZES_2D})
-juffte_add_fortran_test(test2d-out     tests/test2d-out.F90     ${JUFFTE_SIZES_2D})
-juffte_add_fortran_test(test2d-fftwint tests/test2d-fftwint.F90 ${JUFFTE_SIZES_2D})
-juffte_add_fortran_test(test3d         tests/test3d.F90         ${JUFFTE_SIZES_3D})
-juffte_add_fortran_test(test3d-out     tests/test3d-out.F90     ${JUFFTE_SIZES_3D})
-juffte_add_fortran_test(test3d-fftwint tests/test3d-fftwint.F90 ${JUFFTE_SIZES_3D})
-juffte_add_fortran_test(rtest1d        tests/rtest1d.F90        ${JUFFTE_SIZES_1D})
-juffte_add_fortran_test(rtest2d        tests/rtest2d.F90        ${JUFFTE_SIZES_2D})
-juffte_add_fortran_test(rtest3d        tests/rtest3d.F90        ${JUFFTE_SIZES_3D})
-
-# Forward transform against a direct DFT, element by element. Catches what a round
-# trip cancels: a wrong sign convention, a consistent scaling error.
-add_executable(accuracy ${CMAKE_CURRENT_SOURCE_DIR}/tests/accuracy.F90)
-target_link_libraries(accuracy PRIVATE ${LIB_TARGET})
-juffte_add_test_sizes(accuracy ${JUFFTE_SIZES_1D} ${JUFFTE_SIZES_2D} ${JUFFTE_SIZES_3D})
-list(APPEND JUFFTE_TEST_TARGETS accuracy)
-
-# The tests exit non-zero on failure. Do not add PASS_REGULAR_EXPRESSION: it makes
-# CTest ignore the exit status and report failures as passes.
-set_tests_properties(${JUFFTE_TESTS} PROPERTIES FAIL_REGULAR_EXPRESSION "FAIL")
+foreach(lang c f)
+    foreach(dir fw bw)
+        foreach(dim 1 2 3)
+            foreach(size IN LISTS JUFFTE_SIZES_${dim}D)
+                juffte_add_test(${lang} complex ${dir} "${size}")
+                juffte_add_test(${lang} real ${dir} "${size}")
+                juffte_add_test(${lang} complex ${dir} "${size}" -a fftw)
+                if(lang STREQUAL "f" AND dim EQUAL 1)
+                    juffte_add_test(${lang} complex ${dir} "${size}" -a simple)
+                endif()
+            endforeach()
+        endforeach()
+    endforeach()
+endforeach()
 
 add_custom_target(run_tests
     COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running tests:"
-    DEPENDS ${JUFFTE_TEST_TARGETS}
+    DEPENDS juffte_test_c juffte_test_f
 )
+
+# =========================
+# Examples
+# =========================
+# C and Fortran examples share names, so the targets are prefixed and the programs go
+# to examples/c and examples/fortran in the build tree.
+if(BUILD_EXAMPLES)
+    foreach(ex test1d test2d test3d rtest1d rtest2d rtest3d fftw-test fftw-test2d fftw-test3d)
+        add_executable(example_c_${ex} ${CMAKE_CURRENT_SOURCE_DIR}/examples/c/${ex}.c)
+        target_link_libraries(example_c_${ex} PRIVATE ${LIB_TARGET} m)
+        if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+            target_link_libraries(example_c_${ex} PRIVATE gfortran)
+        endif()
+        set_target_properties(example_c_${ex} PROPERTIES OUTPUT_NAME ${ex}
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples/c)
+    endforeach()
+
+    add_library(example_utils OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/examples/fortran/test_utils_m.F90)
+    foreach(ex test1d test1d-out test1dni test1d-fftwint test2d test2d-out test2d-fftwint
+               test3d test3d-out test3d-fftwint rtest1d rtest2d rtest3d)
+        add_executable(example_f_${ex} ${CMAKE_CURRENT_SOURCE_DIR}/examples/fortran/${ex}.F90)
+        target_link_libraries(example_f_${ex} PRIVATE example_utils ${LIB_TARGET})
+        set_target_properties(example_f_${ex} PROPERTIES OUTPUT_NAME ${ex}
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples/fortran)
+    endforeach()
+endif()
 
 # =========================
 # Summary
@@ -398,6 +392,7 @@ message(STATUS "  With SPIRAL:       ${WITHSPRL}")
 message(STATUS "  With SVE:          ${WITHSVE}")
 message(STATUS "  With RVV:          ${WITHRVV}")
 message(STATUS "  Reference FFTW:    ${WITH_REFERENCE_FFTW}")
+message(STATUS "  Examples:          ${BUILD_EXAMPLES}")
 message(STATUS "  Fortran compiler:  ${CMAKE_Fortran_COMPILER}")
 message(STATUS "  OpenMP:            ${OpenMP_Fortran_FOUND}")
 message(STATUS "  Cross compiling:   ${CMAKE_CROSSCOMPILING}")

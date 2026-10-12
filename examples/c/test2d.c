@@ -9,7 +9,7 @@
 #include <string.h>
 #include <math.h>
 #include <float.h>
-#include "../src/juffte.h"
+#include <juffte.h>
 #include "test_utils.h"
 
 #define NDA 16777216

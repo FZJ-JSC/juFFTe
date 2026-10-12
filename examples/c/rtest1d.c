@@ -9,7 +9,7 @@
 #include <math.h>
 #include <complex.h>
 #include <float.h>
-#include "../src/juffte.h"
+#include <juffte.h>
 #include "test_utils.h"
 
 #define NDA 16777216
@@ -22,37 +22,34 @@ int main(int argc, char **argv) {
     static double a[NDA], b[NDA];
     static double _Complex a_c[NDA], b_c[NDA];
 
-    int nx, ny;
+    int n;
     static double a_in[NDA];
     char exe[20];
 
-    if (argc < 3) {
-        printf(" NX = ");
-        scanf("%d", &nx);
-        printf(" NY = ");
-        scanf("%d", &ny);
+    if (argc < 2) {
+        printf(" N = ");
+        scanf("%d", &n);
     } else {
-        nx = atoi(argv[1]);
-        ny = atoi(argv[2]);
+        n = atoi(argv[1]);
     }
 
-    init(a, nx * ny);
-    memcpy(a_in, a, (nx * ny) * sizeof a[0]);  // keep the input for the round-trip check
+    init(a, n);
+    memcpy(a_in, a, (n) * sizeof a[0]);  // keep the input for the round-trip check
 
 
-    dzfft2d_c(a, a_c, nx, ny, juffte_init);
-    dzfft2d_c(a, a_c, nx, ny, juffte_fw);
-    dump(a_c, (nx / 2 + 1) * ny);
+    dzfft1d_c(a, a_c, n, juffte_init);
+    dzfft1d_c(a, a_c, n, juffte_fw);
+    dump(a_c, (n / 2 + 1));
 
-    zdfft2d_c(a_c, a, nx, ny, juffte_init);
+    zdfft1d_c(a_c, a, n, juffte_init);
 
-    zdfft2d_c(a_c, a, nx, ny, juffte_bw);
-    rdump(a, nx * ny);
+    zdfft1d_c(a_c, a, n, juffte_bw);
+    rdump(a, n);
 
     strncpy(exe, argv[0], sizeof(exe) - 1);
     exe[sizeof(exe) - 1] = '\0';
 
-    if (roundtrip_check_r(a_in, a, nx * ny)) {
+    if (roundtrip_check_r(a_in, a, n)) {
         printf("%s PASS\n", exe);
     } else {
         printf("%s FAIL\n", exe);

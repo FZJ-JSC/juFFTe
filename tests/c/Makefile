@@ -8,8 +8,8 @@ CFLAGS = -g -O3
 WITH_REFERENCE_FFTW  ?= 0
 # -g -O3 -ftree-vectorize -fopt-info-vec -mavx512f -fopt-info-vec-missed
 # -fno-tree-vectorize -fno-openmp-simd  # disable vectorization
-LIBDIR ?= ../src
-INCDIR ?= ../src
+LIBDIR ?= ../../src
+INCDIR ?= ../../src
 LIBFLAGS = -L $(LIBDIR)  -I $(INCDIR) -ljuffte -lm -lgfortran
 LIBFLAGSSP = -L $(LIBDIR) -I $(INCDIR) -ljuffte -lm -lgfortran
 
@@ -23,7 +23,7 @@ ifeq ($(WITH_REFERENCE_FFTW), 1)
 endif
 
 ifneq (,$(filter $(CC),icx icx-cc))
-	CFLAGS = -g -O3 -qopt-zmm-usage=high -I..
+	CFLAGS = -g -O3 -qopt-zmm-usage=high -I../..
 #-xCORE-AVX512
 	LIBFLAGS = -L $(LIBDIR)  -I $(INCDIR) -ljuffte -lifcore -lifport 
 	OMPFLAGS = -qopenmp
@@ -44,45 +44,25 @@ endif
 
 # -mprefer-vector-width=512
 CFLAGS  += $(OMPFLAGS) 
-all: test1d test2d test3d rtest1d rtest2d rtest3d fftw-test fftw-test2d fftw-test3d
+all: juffte_test_c
 
-test1d : test1d.c test_utils.h
-	$(CC) $(CFLAGS) $< $(LIBFLAGS)  -o $@
-
-test2d : test2d.c test_utils.h
-	$(CC) $(CFLAGS) $< $(LIBFLAGS) -o $@
-
-test3d : test3d.c test_utils.h
-	$(CC) $(CFLAGS) $< $(LIBFLAGS) -o $@
-
-rtest1d : rtest1d.c test_utils.h
-	$(CC) $(CFLAGS) $< $(LIBFLAGS) -o $@
-
-rtest2d : rtest2d.c test_utils.h
-	$(CC) $(CFLAGS) $< $(LIBFLAGS) -o $@
-
-rtest3d : rtest3d.c test_utils.h
-	$(CC) $(CFLAGS) $< $(LIBFLAGS) -o $@
-
-fftw-test : fftw-test.c
+juffte_test_c : juffte_test.c
 	$(CC) $(CFLAGS) $< $(LIBFLAGS) $(FFTWFLAGS) -o $@
 
-fftw-test2d : fftw-test2d.c
-	$(CC) $(CFLAGS) $< $(LIBFLAGS) $(FFTWFLAGS) -o $@
-
-fftw-test3d : fftw-test3d.c
-	$(CC) $(CFLAGS) $< $(LIBFLAGS) $(FFTWFLAGS) -o $@
-
-# Same lengths as CMakeLists.txt (JUFFTE_SIZES_*); see the comment there.
+# Same lengths and cases as CMakeLists.txt (JUFFTE_SIZES_*); see the comment there.
 SIZES_1D = 2 9 96 100 120 1024
-SIZES_2D = "2 2" "9 96" "96 64" "120 100" "256 256"
+SIZES_2D = "2 2" "9 96" "20 60" "96 64" "120 100" "256 256"
 SIZES_3D = "2 2 2" "9 16 20" "12 18 20" "32 32 32"
+T = ./juffte_test_c
 
-test  :   test1d test2d test3d rtest1d rtest2d rtest3d fftw-test fftw-test2d fftw-test3d
-	for t in test1d rtest1d; do for s in $(SIZES_1D); do ./$$t $$s || exit 1; done; done
-	for t in test2d rtest2d; do for s in $(SIZES_2D); do ./$$t $$s || exit 1; done; done
-	for t in test3d rtest3d; do for s in $(SIZES_3D); do ./$$t $$s || exit 1; done; done
-	./fftw-test 2 && ./fftw-test2d 2 2 && ./fftw-test3d 2 2 2
+# Exit status 77: no reference at this size (N >= 4000 without FFTW), not a failure.
+test : juffte_test_c
+	set -e; t() { $(T) "$$@" || [ $$? -eq 77 ]; }; for d in fw bw; do \
+	    for s in $(SIZES_1D); do t -t complex -d $$d $$s; t -t real -d $$d $$s; \
+	        t -t complex -d $$d -a fftw $$s; done; \
+	    for s in $(SIZES_2D) $(SIZES_3D); do t -t complex -d $$d $$s; t -t real -d $$d $$s; \
+	        t -t complex -d $$d -a fftw $$s; done; \
+	done
 
 clean:
-	rm -f test1d test1dni test2d test3d rtest1d rtest2d rtest3d fftw-test fftw-test2d fftw-test3d *.o *.mod 
+	rm -f juffte_test_c *.o

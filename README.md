@@ -29,6 +29,7 @@ Options:
 | `-DWITHRVV=ON`            | RISC-V RVV kernels (implies `WITHSPRL`)     |
 | `-DWITHSVE=ON`            | Arm SVE kernels (implies `WITHSPRL`)        |
 | `-DWITH_REFERENCE_FFTW=ON`| Build the comparisons against a reference FFTW|
+| `-DBUILD_EXAMPLES=OFF`    | Skip the programs in `examples/`            |
 | `-DBUILD_SHARED_LIBS=ON`  | Shared instead of static library            |
 
 Only the RVV kernels are currently generated: `-DWITHSVE=ON`, and `-DWITHSPRL=ON` on its
@@ -70,8 +71,8 @@ ctest --test-dir build-riscv --output-on-failure
 
 ### Makefile build
 
-A plain Makefile build also exists, and is what the `tests`, `ctests` and `benchmark`
-directories link against by default:
+A plain Makefile build also exists, and is what `tests/c`, `tests/fortran`, `examples/c`,
+`examples/fortran` and `benchmark` link against by default:
 
 ```
 cd src
@@ -140,7 +141,8 @@ libraries at once — which is how the benchmark compares them.
 Known limitation: only one plan can be live at a time. Creating a second plan currently
 fails. See the open issues.
 
-See the example files `fftw-test.c` and `test1d-fftwint.F90` in the test folders.
+See `examples/c/fftw-test*.c` and `examples/fortran/test*-fftwint.F90` for FFTW code running on
+juFFTe.
 
 ### OpenMP
 
