@@ -22,6 +22,7 @@ includes both `fftw3.h` and `juffte.h`, which is what `JUFFTE_NO_FFTW_NAMES` is 
 ```
 make
 make test
+make test THOROUGH=1
 make test WITH_REFERENCE_FFTW=1 FFTWINC=/usr/include FFTWLIB=/usr/lib64
 ./juffte_test_c -t real -d bw 12 18 20
 ```

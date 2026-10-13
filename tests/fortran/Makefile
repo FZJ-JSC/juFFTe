@@ -46,10 +46,13 @@ all: juffte_test_f
 juffte_test_f : juffte_test.F90
 	$(FC) $(FCFLAGS) $< $(LIBFLAGS) $(FFTWFLAGS) -o $@
 
-# Same lengths and cases as CMakeLists.txt (JUFFTE_SIZES_*); see the comment there.
-SIZES_1D = 2 9 96 100 120 1024
-SIZES_2D = "2 2" "9 96" "20 60" "96 64" "120 100" "256 256"
-SIZES_3D = "2 2 2" "9 16 20" "12 18 20" "32 32 32"
+# Size lists shared with CMakeLists.txt; THOROUGH=1 adds the long ones.
+include ../sizes.mk
+ifeq ($(THOROUGH), 1)
+    SIZES_1D += $(THOROUGH_1D)
+    SIZES_2D += $(THOROUGH_2D)
+    SIZES_3D += $(THOROUGH_3D)
+endif
 T = ./juffte_test_f
 
 # Exit status 77: no reference at this size (N >= 4000 without FFTW), not a failure.

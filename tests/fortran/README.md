@@ -33,15 +33,19 @@ The direct DFT runs along one dimension at a time and never forms the DFT matrix
 
 Exit status: 0 pass, 1 fail, 2 usage error, 77 skipped (CTest reports it as such).
 
-Only one size can be initialised per process, so every case is a separate run.
+Only one size can be initialised per process, so every case is a separate run. The sizes are
+listed in `tests/sizes.mk`, which CMake and both test Makefiles read. The thorough set adds
+about a thousand more cases: every 2-3-5 length up to 128, powers of each radix, the size caps
+and lopsided shapes.
 
 ## Building and running
 
 With CMake, from the repository root, `ctest` runs every case:
 
 ```
-cmake -S . -B build [-DWITH_REFERENCE_FFTW=ON] && cmake --build build
+cmake -S . -B build [-DWITH_REFERENCE_FFTW=ON] [-DTHOROUGH_TESTS=ON] && cmake --build build
 ctest --test-dir build --output-on-failure
+ctest --test-dir build -LE thorough        # only the default sizes
 ```
 
 With the Makefile, against an in-tree `make`-built library:
@@ -49,6 +53,7 @@ With the Makefile, against an in-tree `make`-built library:
 ```
 make
 make test
+make test THOROUGH=1
 make test WITH_REFERENCE_FFTW=1 FFTWINC=/usr/include
 ./juffte_test_f -t real -d bw 96 64
 ```

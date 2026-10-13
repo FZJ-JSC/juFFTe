@@ -29,6 +29,7 @@ Options:
 | `-DWITHRVV=ON`            | RISC-V RVV kernels (implies `WITHSPRL`)     |
 | `-DWITHSVE=ON`            | Arm SVE kernels (implies `WITHSPRL`)        |
 | `-DWITH_REFERENCE_FFTW=ON`| Build the comparisons against a reference FFTW|
+| `-DTHOROUGH_TESTS=ON`     | Test about a thousand more sizes            |
 | `-DBUILD_EXAMPLES=OFF`    | Skip the programs in `examples/`            |
 | `-DBUILD_SHARED_LIBS=ON`  | Shared instead of static library            |
 

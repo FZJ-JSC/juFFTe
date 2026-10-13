@@ -17,6 +17,7 @@ option(WITHSVE "Build with SVE backend" OFF)
 option(WITHRVV "Build with RVV backend" OFF)
 option(WITH_REFERENCE_FFTW "Build the comparisons against a reference FFTW" OFF)
 option(BUILD_EXAMPLES "Build the example programs in examples/" ON)
+option(THOROUGH_TESTS "Test many more sizes (tests/sizes.mk)" OFF)
 
 # =========================
 # Validate options
@@ -304,19 +305,26 @@ if(WITH_REFERENCE_FFTW)
     endforeach()
 endif()
 
-# Length 2 alone never needs a second radix-3 stage (9), radix 5 (100), every radix
-# (120) or a non-square shape, which is how the single-precision fft3b constant fixed
-# in e253422 went unnoticed. 20x60 keeps 2-D radix 5 below the direct DFT's N < 4000. The six-step branch (1-D n > 174762) is not covered yet:
-# it crashes at the default 8 MB stack, and its out-of-place backward and 1-D r2c
-# paths are broken.
-set(JUFFTE_SIZES_1D "2" "9" "96" "100" "120" "1024")
-set(JUFFTE_SIZES_2D "2 2" "9 96" "20 60" "96 64" "120 100" "256 256")
-set(JUFFTE_SIZES_3D "2 2 2" "9 16 20" "12 18 20" "32 32 32")
+# The size lists live in tests/sizes.mk, which the Makefiles in tests/c and tests/fortran
+# include: JUFFTE_SIZES_1D ... JUFFTE_THOROUGH_3D, one list entry per size.
+set(JUFFTE_SIZES_FILE ${CMAKE_CURRENT_SOURCE_DIR}/tests/sizes.mk)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${JUFFTE_SIZES_FILE})
+file(READ ${JUFFTE_SIZES_FILE} sizes_mk)
+string(REPLACE "\\\n" " " sizes_mk "${sizes_mk}")
+string(REGEX MATCHALL "\n[A-Z0-9_]+ *=[^\n]*" size_lines "${sizes_mk}")
+foreach(line IN LISTS size_lines)
+    string(REGEX MATCH "([A-Z0-9_]+) *=(.*)" _ "${line}")
+    set(name ${CMAKE_MATCH_1})
+    string(REGEX MATCHALL "\"[^\"]*\"|[0-9]+" entries "${CMAKE_MATCH_2}")
+    string(REPLACE "\"" "" entries "${entries}")
+    set(JUFFTE_${name} ${entries})
+endforeach()
 
 # One case per process, named like f_real_bw_9x96 or c_complex_fw_1024_fftw: a second
 # size in one process hits the single-plan limit. Without FFTW, sizes with N >= 4000
-# have no reference and are reported as skipped (exit status 77).
-function(juffte_add_test lang type dir size)
+# have no reference and are reported as skipped (exit status 77). The thorough sizes
+# carry the label "thorough" (ctest -L thorough / -LE thorough).
+function(juffte_add_test lang type dir size label)
     string(REPLACE " " ";" n "${size}")
     string(REPLACE " " "x" tag "${size}")
     set(name ${lang}_${type}_${dir}_${tag})
@@ -327,19 +335,27 @@ function(juffte_add_test lang type dir size)
     add_test(NAME ${name} COMMAND juffte_test_${lang} -t ${type} -d ${dir} ${ARGN} ${n})
     # Do not add PASS_REGULAR_EXPRESSION: it makes CTest ignore the exit status and
     # report failures as passes.
-    set_tests_properties(${name} PROPERTIES SKIP_RETURN_CODE 77 FAIL_REGULAR_EXPRESSION "FAIL")
+    set_tests_properties(${name} PROPERTIES SKIP_RETURN_CODE 77 FAIL_REGULAR_EXPRESSION "FAIL"
+                                            LABELS ${label})
 endfunction()
 
-foreach(lang c f)
-    foreach(dir fw bw)
-        foreach(dim 1 2 3)
-            foreach(size IN LISTS JUFFTE_SIZES_${dim}D)
-                juffte_add_test(${lang} complex ${dir} "${size}")
-                juffte_add_test(${lang} real ${dir} "${size}")
-                juffte_add_test(${lang} complex ${dir} "${size}" -a fftw)
-                if(lang STREQUAL "f" AND dim EQUAL 1)
-                    juffte_add_test(${lang} complex ${dir} "${size}" -a simple)
-                endif()
+set(kinds SIZES)
+if(THOROUGH_TESTS)
+    list(APPEND kinds THOROUGH)
+endif()
+foreach(kind IN LISTS kinds)
+    string(TOLOWER ${kind} label)
+    foreach(dim 1 2 3)
+        foreach(size IN LISTS JUFFTE_${kind}_${dim}D)
+            foreach(lang c f)
+                foreach(dir fw bw)
+                    juffte_add_test(${lang} complex ${dir} "${size}" ${label})
+                    juffte_add_test(${lang} real ${dir} "${size}" ${label})
+                    juffte_add_test(${lang} complex ${dir} "${size}" ${label} -a fftw)
+                    if(lang STREQUAL "f" AND dim EQUAL 1)
+                        juffte_add_test(${lang} complex ${dir} "${size}" ${label} -a simple)
+                    endif()
+                endforeach()
             endforeach()
         endforeach()
     endforeach()
