@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <riscv_vector.h>
 
-void dft2a_r32_(float *Y, float *X, float *TW1, int64_t *lp1) {
+void dft2a_r32_(float *Y, float *X, float *TW1, int *lp1) {
     int64_t a93, l1;
     float *a94;
     vfloat32m1x2_t r15, r16;
@@ -31,13 +31,13 @@ void dft2a_r32_(float *Y, float *X, float *TW1, int64_t *lp1) {
         s45 = __riscv_vfsub(s39, s41, vl1);
         s46 = __riscv_vfsub(s40, s42, vl1);
         a94 = (TW1 + a93);
-        a95 = __riscv_vlse32_v_f32m1(a94, sizeof(double) * 2, vl1);
-        a96 = __riscv_vlse32_v_f32m1((a94 + 1), sizeof(double) * 2, vl1);
+        a95 = __riscv_vlse32_v_f32m1(a94, sizeof(float) * 2, vl1);
+        a96 = __riscv_vlse32_v_f32m1((a94 + 1), sizeof(float) * 2, vl1);
         s47 = __riscv_vfmsac(__riscv_vfmul(a96, s46, vl1), a95, s45, vl1);
         s48 = __riscv_vfmacc(__riscv_vfmul(a95, s46, vl1), a96, s45, vl1);
-        __riscv_vsse32((Y + ((4)*(j1))), sizeof(double) * 4, s43, vl1);
-        __riscv_vsse32((1 + Y + ((4)*(j1))), sizeof(double) * 4, s44, vl1);
-        __riscv_vsse32((2 + Y + ((4)*(j1))), sizeof(double) * 4, s47, vl1);
-        __riscv_vsse32((3 + Y + ((4)*(j1))), sizeof(double) * 4, s48, vl1);
+        __riscv_vsse32((Y + ((4)*(j1))), sizeof(float) * 4, s43, vl1);
+        __riscv_vsse32((1 + Y + ((4)*(j1))), sizeof(float) * 4, s44, vl1);
+        __riscv_vsse32((2 + Y + ((4)*(j1))), sizeof(float) * 4, s47, vl1);
+        __riscv_vsse32((3 + Y + ((4)*(j1))), sizeof(float) * 4, s48, vl1);
     }
 }

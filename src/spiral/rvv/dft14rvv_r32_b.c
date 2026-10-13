@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <riscv_vector.h>
 
-void dft14b_r32_(float *Y, float *X, float *TW1, int64_t *lp1, int64_t *mp1) {
+void dft14b_r32_(float *Y, float *X, float *TW1, int *lp1, int *mp1) {
     float a3703, a3704, a3705, a3706, a3707, a3708, a3709, a3710, 
             a3711, a3712, a3713, a3714, a3715, a3716, a3717, a3718, 
             a3719, a3720, a3721, a3722, a3723, a3724, a3725, a3726, 
