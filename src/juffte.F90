@@ -68,10 +68,12 @@ if (juffte_initialized .eqv. .false. ) then
 
     end function fftw_plan_dft_1d
 
-    type(C_PTR) function fftw_plan_dft_2d(nx,ny,input,output,sign,flags)
+    ! As in FFTW, dimensions are given slowest first, the reverse of the native API:
+    ! a(nx, ny) is planned as (ny, nx), which is zfft2d(a, nx, ny).
+    type(C_PTR) function fftw_plan_dft_2d(n0,n1,input,output,sign,flags)
         implicit none
 
-        integer(C_INT), value             :: nx, ny
+        integer(C_INT), value             :: n0, n1
         complex(real64), intent(inout)         :: input(:)
         complex(real64), intent(inout)         :: output(:)
         integer(C_INT), value, intent(in) :: sign
@@ -79,8 +81,8 @@ if (juffte_initialized .eqv. .false. ) then
 
         fftw_plan = flags
         fftw_dir  = sign
-        fftw_nx   = nx
-        fftw_ny   = ny
+        fftw_nx   = n1
+        fftw_ny   = n0
         fftw_rank = 2
 
         if (juffte_initialized .eqv. .false. ) then
@@ -94,10 +96,10 @@ if (juffte_initialized .eqv. .false. ) then
 
         end function fftw_plan_dft_2d
 
-    type(C_PTR) function fftw_plan_dft_3d(nx,ny,nz,input,output,sign,flags)
+    type(C_PTR) function fftw_plan_dft_3d(n0,n1,n2,input,output,sign,flags)
         implicit none
 
-        integer(C_INT), value             :: nx, ny, nz
+        integer(C_INT), value             :: n0, n1, n2
         complex(real64), intent(inout)         :: input(:)
         complex(real64), intent(inout)         :: output(:)
         integer(C_INT), value, intent(in) :: sign
@@ -105,9 +107,9 @@ if (juffte_initialized .eqv. .false. ) then
 
         fftw_plan = flags
         fftw_dir  = sign
-        fftw_nx   = nx
-        fftw_ny   = ny
-        fftw_nz   = nz
+        fftw_nx   = n2
+        fftw_ny   = n1
+        fftw_nz   = n0
         fftw_rank = 3
 
         if (juffte_initialized .eqv. .false. ) then

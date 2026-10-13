@@ -61,20 +61,33 @@ subroutine zfft2d_64(a, nx, ny, iopt, out)
         return
     end if
 
+    ! Out of place, conjugate into out and transform that in place, so a is not modified.
     if (iopt == juffte_bw) then
+        if (present(out)) then
+!$OMP PARALLEL DO
+!DIR$ VECTOR ALIGNED
+            do i = 1, nx*ny
+                out(i) = dconjg(a(i))
+            end do
+        else
 !$OMP PARALLEL DO
 !DIR$ VECTOR ALIGNED
             do i = 1, nx*ny
                 a(i) = dconjg(a(i))
             end do
+        end if
     end if
 #ifndef SPRL
     call factor(nx, lnx)
     call factor(ny, lny)
 #endif
-if (present(out)) then
+if (present(out) .and. iopt /= juffte_bw) then
 !$OMP PARALLEL PRIVATE(C)
     call zfft2d0_64(a, b, c, wx, wy, nx, ny, lnx, lny, out)
+!$OMP END PARALLEL
+else if (present(out)) then
+!$OMP PARALLEL PRIVATE(C)
+    call zfft2d0_64(out, b, c, wx, wy, nx, ny, lnx, lny)
 !$OMP END PARALLEL
 else
 !$OMP PARALLEL PRIVATE(C)
@@ -197,20 +210,33 @@ subroutine zfft2d_32(a, nx, ny, iopt, out)
         return
     end if
 
+    ! Out of place, conjugate into out and transform that in place, so a is not modified.
     if (iopt == juffte_bw) then
+        if (present(out)) then
+!$OMP PARALLEL DO
+!DIR$ VECTOR ALIGNED
+            do i = 1, nx*ny
+                out(i) = conjg(a(i))
+            end do
+        else
 !$OMP PARALLEL DO
 !DIR$ VECTOR ALIGNED
             do i = 1, nx*ny
                 a(i) = conjg(a(i))
             end do
+        end if
     end if
 #ifndef SPRL
     call factor(nx, lnx)
     call factor(ny, lny)
 #endif
-if (present(out)) then
+if (present(out) .and. iopt /= juffte_bw) then
 !$OMP PARALLEL PRIVATE(C)
     call zfft2d0_32(a, b_r32, c, wx, wy, nx, ny, lnx, lny, out)
+!$OMP END PARALLEL
+else if (present(out)) then
+!$OMP PARALLEL PRIVATE(C)
+    call zfft2d0_32(out, b_r32, c, wx, wy, nx, ny, lnx, lny)
 !$OMP END PARALLEL
 else
 !$OMP PARALLEL PRIVATE(C)

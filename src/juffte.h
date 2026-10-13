@@ -17,6 +17,7 @@ extern "C" {
 enum { juffte_init = 0, juffte_fw = -1, juffte_bw = 1 };
 
 // Native C API. The complex type is layout-compatible with fftw_complex below.
+// Dimensions are given contiguous first: in zfft2d_c(a, nx, ny, ...), nx is contiguous.
 #define CLXTYP double _Complex
 
 void zfft1d_c(CLXTYP *input, int n, int iopt);
@@ -39,9 +40,10 @@ void zdfft3d_c(CLXTYP *a, double *a_r, int nx, int ny, int nz, int iopt);
 // ----------------------------------------------------------------------------
 
 // Matches FFTW's fallback typedef, so in[i][0] / in[i][1] behave as expected.
-typedef double fftw_complex[2];
+typedef double juffte_fftw_complex[2];
 
-// Values taken from fftw3.h so that flags compare and combine identically.
+// Values taken from fftw3.h so that flags compare and combine identically. The
+// definitions are token for token those of fftw3.h, so both headers can be included.
 #define FFTW_FORWARD (-1)
 #define FFTW_BACKWARD (+1)
 #define FFTW_MEASURE (0U)
@@ -50,7 +52,7 @@ typedef double fftw_complex[2];
 #define FFTW_ESTIMATE (1U << 6)
 
 // Opaque, and a pointer as in FFTW, so that `fftw_plan p = NULL;` compiles.
-typedef struct juffte_plan_s *fftw_plan;
+typedef struct juffte_plan_s *juffte_fftw_plan;
 
 // The entry points carry juffte_ names so that the library exports nothing that
 // clashes with real FFTW; a program can therefore link juFFTe and libfftw3 side
@@ -60,17 +62,28 @@ typedef struct juffte_plan_s *fftw_plan;
 void *juffte_fftw_malloc(size_t n);
 void juffte_fftw_free(void *p);
 
-fftw_plan juffte_fftw_plan_dft_1d(int n, fftw_complex *in, fftw_complex *out, int dir, int flag);
-fftw_plan juffte_fftw_plan_dft_2d(int nx, int ny, fftw_complex *in, fftw_complex *out,
-                                  int dir, int flag);
-fftw_plan juffte_fftw_plan_dft_3d(int nx, int ny, int nz, fftw_complex *in, fftw_complex *out,
-                                  int dir, int flag);
+// Dimension order as in FFTW, the reverse of the native API above: slowest first, the
+// contiguous one last. fftw_plan_dft_2d(n0, n1, ...) transforms an n0 x n1 row-major
+// array, the same as zfft2d_c(a, n1, n0, ...).
+juffte_fftw_plan juffte_fftw_plan_dft_1d(int n, juffte_fftw_complex *in,
+                                         juffte_fftw_complex *out, int dir, int flag);
+juffte_fftw_plan juffte_fftw_plan_dft_2d(int n0, int n1, juffte_fftw_complex *in,
+                                         juffte_fftw_complex *out, int dir, int flag);
+juffte_fftw_plan juffte_fftw_plan_dft_3d(int n0, int n1, int n2, juffte_fftw_complex *in,
+                                         juffte_fftw_complex *out, int dir, int flag);
 
-void juffte_fftw_execute(const fftw_plan p);
-void juffte_fftw_execute_dft(const fftw_plan p, fftw_complex *in, fftw_complex *out);
-void juffte_fftw_destroy_plan(fftw_plan p);
+void juffte_fftw_execute(const juffte_fftw_plan p);
+void juffte_fftw_execute_dft(const juffte_fftw_plan p, juffte_fftw_complex *in,
+                             juffte_fftw_complex *out);
+void juffte_fftw_destroy_plan(juffte_fftw_plan p);
 
-void juffte_fft_plan_print(const fftw_plan p); // debug helper, not part of the FFTW API
+void juffte_fft_plan_print(const juffte_fftw_plan p); // debug helper, not part of the FFTW API
+
+// Define JUFFTE_NO_FFTW_NAMES to leave FFTW's names alone, e.g. to include fftw3.h
+// as well and call both libraries from one file (the test suite does).
+#ifndef JUFFTE_NO_FFTW_NAMES
+typedef juffte_fftw_complex fftw_complex;
+typedef juffte_fftw_plan    fftw_plan;
 
 #define fftw_malloc        juffte_fftw_malloc
 #define fftw_free          juffte_fftw_free
@@ -81,6 +94,7 @@ void juffte_fft_plan_print(const fftw_plan p); // debug helper, not part of the 
 #define fftw_execute_dft   juffte_fftw_execute_dft
 #define fftw_destroy_plan  juffte_fftw_destroy_plan
 #define fft_plan_print     juffte_fft_plan_print
+#endif // JUFFTE_NO_FFTW_NAMES
 
 #ifdef __cplusplus
 }

@@ -111,31 +111,33 @@ fftw_plan fftw_plan_dft_1d(int n, fftw_complex *in, fftw_complex *out, int dir, 
     return p;
 }
 
-fftw_plan fftw_plan_dft_2d(int nx, int ny, fftw_complex *in, fftw_complex *out, int dir, int flag)
+// As in FFTW, dimensions are given slowest first, the reverse of the native API, where nx
+// is the contiguous one: (n0, n1) here is zfft2d(n1, n0).
+fftw_plan fftw_plan_dft_2d(int n0, int n1, fftw_complex *in, fftw_complex *out, int dir, int flag)
 {
-    fftw_plan p = plan_alloc(2, nx, ny, 1, in, out, dir, flag);
+    fftw_plan p = plan_alloc(2, n1, n0, 1, in, out, dir, flag);
     if (!p)
         return NULL;
 
     if (in == out)
-        zfft2d_c(cx(in), nx, ny, juffte_init);
+        zfft2d_c(cx(in), p->nx, p->ny, juffte_init);
     else
-        zfft2d_out_c(cx(in), cx(out), nx, ny, juffte_init);
+        zfft2d_out_c(cx(in), cx(out), p->nx, p->ny, juffte_init);
 
     return p;
 }
 
-fftw_plan fftw_plan_dft_3d(int nx, int ny, int nz, fftw_complex *in, fftw_complex *out,
+fftw_plan fftw_plan_dft_3d(int n0, int n1, int n2, fftw_complex *in, fftw_complex *out,
                            int dir, int flag)
 {
-    fftw_plan p = plan_alloc(3, nx, ny, nz, in, out, dir, flag);
+    fftw_plan p = plan_alloc(3, n2, n1, n0, in, out, dir, flag);
     if (!p)
         return NULL;
 
     if (in == out)
-        zfft3d_c(cx(in), nx, ny, nz, juffte_init);
+        zfft3d_c(cx(in), p->nx, p->ny, p->nz, juffte_init);
     else
-        zfft3d_out_c(cx(in), cx(out), nx, ny, nz, juffte_init);
+        zfft3d_out_c(cx(in), cx(out), p->nx, p->ny, p->nz, juffte_init);
 
     return p;
 }

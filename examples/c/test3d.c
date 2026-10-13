@@ -5,38 +5,47 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <complex.h>
 #include <string.h>
+#include <complex.h>
 #include <math.h>
 #include <float.h>
-#include "../src/juffte.h"
+#include <juffte.h>
 #include "test_utils.h"
 
+#define NDA 16777216
 
 void init(double _Complex* a, int n);
 void dump(const double _Complex* a, int n);
 
 int main(int argc, char** argv) {
-    int n;
-    if (argc < 2) {
-        printf("n = ");
-        if (scanf("%d", &n) != 1 || n <= 0) {
-            fprintf(stderr, "Invalid input for n.\n");
-            return 1;
-        }
+    int nx, ny, nz;
+
+    if (argc < 4) {
+        printf(" NX = "); if (scanf("%d", &nx) != 1) return 1;
+        printf(" NY = "); if (scanf("%d", &ny) != 1) return 1;
+        printf(" NZ = "); if (scanf("%d", &nz) != 1) return 1;
     } else {
-        n = atoi(argv[1]);
+        nx = atoi(argv[1]);
+        ny = atoi(argv[2]);
+        nz = atoi(argv[3]);
     }
 
-    double _Complex* a = calloc(n, sizeof(double _Complex));
- 
+    int n = nx * ny * nz;
+    if (n > NDA) {
+        fprintf(stderr, "Size %d exceeds buffer limit %d\n", n, NDA);
+        return 1;
+    }
+
+    double _Complex* a = calloc(NDA, sizeof(double _Complex));
     if (!a) {
-        fprintf(stderr, "Memory allocation failed.\n");
+        perror("calloc");
         return 1;
     }
 
     init(a, n);
-    dump(a, n);
+
+    // init FFT
+    zfft3d_c(a, nx, ny, nz, juffte_init);
 
     // Keep the input for the round-trip check.
 
@@ -52,37 +61,37 @@ int main(int argc, char** argv) {
 
     memcpy(a_in, a, n * sizeof *a_in);
 
-    zfft1d_c(a, n, juffte_init);   
-    zfft1d_c(a, n, juffte_fw);     
+    // Inverse FFT
+    zfft3d_c(a, nx, ny, nz, juffte_fw);
     dump(a, n);
 
-    zfft1d_c(a, n, juffte_bw);    
+    // Forward FFT again
+    zfft3d_c(a, nx, ny, nz, juffte_bw);
     dump(a, n);
 
-    const char* exe = argv[0];
     if (roundtrip_check_c(a_in, a, n)) {
-        printf("%s PASS\n", exe);
+        printf("%s PASS\n", argv[0]);
     } else {
-        printf("%s FAIL\n", exe);
+        printf("%s FAIL\n", argv[0]);
+        free(a);
+        free(a_in);
         return 1;
     }
 
     free(a);
 
     free(a_in);
-
     return 0;
 }
 
 void init(double _Complex* a, int n) {
-#pragma omp parallel for simd
     for (int i = 0; i < n; ++i) {
-        a[i] = i + 1.0 + _Complex_I * (n - i);
+        a[i] = (double)(i + 1) + _Complex_I * (double)(n - i);
     }
 }
 
 void dump(const double _Complex* a, int n) {
     for (int i = 0; i < n; ++i) {
-        printf("%4d: %.4f + %.4fi\n", i + 1, creal(a[i]), cimag(a[i]));
+        printf("%4d: %.6f + %.6fi\n", i + 1, creal(a[i]), cimag(a[i]));
     }
 }

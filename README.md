@@ -29,6 +29,8 @@ Options:
 | `-DWITHRVV=ON`            | RISC-V RVV kernels (implies `WITHSPRL`)     |
 | `-DWITHSVE=ON`            | Arm SVE kernels (implies `WITHSPRL`)        |
 | `-DWITH_REFERENCE_FFTW=ON`| Build the comparisons against a reference FFTW|
+| `-DTHOROUGH_TESTS=ON`     | Test about a thousand more sizes            |
+| `-DBUILD_EXAMPLES=OFF`    | Skip the programs in `examples/`            |
 | `-DBUILD_SHARED_LIBS=ON`  | Shared instead of static library            |
 
 Only the RVV kernels are currently generated: `-DWITHSVE=ON`, and `-DWITHSPRL=ON` on its
@@ -70,8 +72,8 @@ ctest --test-dir build-riscv --output-on-failure
 
 ### Makefile build
 
-A plain Makefile build also exists, and is what the `tests`, `ctests` and `benchmark`
-directories link against by default:
+A plain Makefile build also exists, and is what `tests/c`, `tests/fortran`, `examples/c`,
+`examples/fortran` and `benchmark` link against by default:
 
 ```
 cd src
@@ -103,6 +105,8 @@ Edit the Makefile if necessary for your system setup.
 
 - `juffte_x` can be `juffte_init` for initialization, `juffte_fw` for forward FFT, or `juffte_bw` for backward.
 - `_out` denotes the out-of-place transformation (output goes last).
+- Dimensions are given contiguous first: in `zfft2d(a, nx, ny, ...)`, `nx` is the contiguous
+  one (Fortran's array order), from C as well.
 - Real-to-complex FFTs produce output in half-complex format with size `(n/2 + 1)` in the first dimension.
 - The API supports both single-precision (FP32) and double-precision (FP64) floating-point types for Fortran.
 
@@ -120,11 +124,18 @@ Edit the Makefile if necessary for your system setup.
 | `fftw_malloc(size)`                                       | yes   | –           |
 | `fftw_free(ptr)`                                          | yes   | –           |
 | `fftw_plan_dft_1d(n, in, out, sign, flags)`               | yes   | yes         |
-| `fftw_plan_dft_2d(nx, ny, in, out, sign, flags)`          | yes   | yes         |
-| `fftw_plan_dft_3d(nx, ny, nz, in, out, sign, flags)`      | yes   | yes         |
+| `fftw_plan_dft_2d(n0, n1, in, out, sign, flags)`          | yes   | yes         |
+| `fftw_plan_dft_3d(n0, n1, n2, in, out, sign, flags)`      | yes   | yes         |
 | `fftw_execute(plan)`                                      | yes   | –           |
 | `fftw_execute_dft(plan, in, out)`                         | yes   | yes         |
 | `fftw_destroy_plan(plan)`                                 | yes   | yes         |
+
+**Dimension order.** FFTW lists the dimensions the other way round from juFFTe's native API:
+slowest first, the contiguous one last (C's row-major order). `fftw_plan_dft_2d(n0, n1, ...)`
+describes an `n0 x n1` array with `n1` contiguous, the same transform as
+`zfft2d(a, n1, n0, ...)`. From Fortran this means reversing the declared shape: `a(nx, ny)` is
+planned as `fftw_plan_dft_2d(ny, nx, ...)`, exactly as with FFTW's own Fortran interface. The
+layer follows FFTW here, so that ported code runs unchanged.
 
 The layer is always built into `libjuffte` — no build option, macro or extra library. From C,
 include `juffte.h` instead of `fftw3.h`; from Fortran, `use juffte` instead of
@@ -137,7 +148,8 @@ libraries at once — which is how the benchmark compares them.
 Known limitation: only one plan can be live at a time. Creating a second plan currently
 fails. See the open issues.
 
-See the example files `fftw-test.c` and `test1d-fftwint.F90` in the test folders.
+See `examples/c/fftw-test*.c` and `examples/fortran/test*-fftwint.F90` for FFTW code running on
+juFFTe.
 
 ### OpenMP
 
