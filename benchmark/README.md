@@ -85,6 +85,3 @@ When built with FFTW (`WITH_REFERENCE_FFTW=1`), it also outputs FFTW timing for 
 ```
 make clean
 ```
-## Known issues
-
--  Segmentation faults may occur during execution in some environments. If this happens, it is recommended to increase both the system stack size and the OpenMP (OMP) stack size.
