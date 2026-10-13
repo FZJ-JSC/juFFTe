@@ -17,6 +17,7 @@ extern "C" {
 enum { juffte_init = 0, juffte_fw = -1, juffte_bw = 1 };
 
 // Native C API. The complex type is layout-compatible with fftw_complex below.
+// Dimensions are given contiguous first: in zfft2d_c(a, nx, ny, ...), nx is contiguous.
 #define CLXTYP double _Complex
 
 void zfft1d_c(CLXTYP *input, int n, int iopt);
@@ -61,6 +62,9 @@ typedef struct juffte_plan_s *juffte_fftw_plan;
 void *juffte_fftw_malloc(size_t n);
 void juffte_fftw_free(void *p);
 
+// Dimension order as in FFTW, the reverse of the native API above: slowest first, the
+// contiguous one last. fftw_plan_dft_2d(n0, n1, ...) transforms an n0 x n1 row-major
+// array, the same as zfft2d_c(a, n1, n0, ...).
 juffte_fftw_plan juffte_fftw_plan_dft_1d(int n, juffte_fftw_complex *in,
                                          juffte_fftw_complex *out, int dir, int flag);
 juffte_fftw_plan juffte_fftw_plan_dft_2d(int n0, int n1, juffte_fftw_complex *in,

@@ -105,6 +105,8 @@ Edit the Makefile if necessary for your system setup.
 
 - `juffte_x` can be `juffte_init` for initialization, `juffte_fw` for forward FFT, or `juffte_bw` for backward.
 - `_out` denotes the out-of-place transformation (output goes last).
+- Dimensions are given contiguous first: in `zfft2d(a, nx, ny, ...)`, `nx` is the contiguous
+  one (Fortran's array order), from C as well.
 - Real-to-complex FFTs produce output in half-complex format with size `(n/2 + 1)` in the first dimension.
 - The API supports both single-precision (FP32) and double-precision (FP64) floating-point types for Fortran.
 
@@ -128,8 +130,12 @@ Edit the Makefile if necessary for your system setup.
 | `fftw_execute_dft(plan, in, out)`                         | yes   | yes         |
 | `fftw_destroy_plan(plan)`                                 | yes   | yes         |
 
-As in FFTW, dimensions are given slowest first: from C, `n1` (or `n2`) is the contiguous one;
-from Fortran, an array `a(nx, ny)` is planned as `fftw_plan_dft_2d(ny, nx, ...)`.
+**Dimension order.** FFTW lists the dimensions the other way round from juFFTe's native API:
+slowest first, the contiguous one last (C's row-major order). `fftw_plan_dft_2d(n0, n1, ...)`
+describes an `n0 x n1` array with `n1` contiguous, the same transform as
+`zfft2d(a, n1, n0, ...)`. From Fortran this means reversing the declared shape: `a(nx, ny)` is
+planned as `fftw_plan_dft_2d(ny, nx, ...)`, exactly as with FFTW's own Fortran interface. The
+layer follows FFTW here, so that ported code runs unchanged.
 
 The layer is always built into `libjuffte` — no build option, macro or extra library. From C,
 include `juffte.h` instead of `fftw3.h`; from Fortran, `use juffte` instead of

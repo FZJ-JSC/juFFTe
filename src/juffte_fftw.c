@@ -111,7 +111,8 @@ fftw_plan fftw_plan_dft_1d(int n, fftw_complex *in, fftw_complex *out, int dir, 
     return p;
 }
 
-// As in FFTW, dimensions are given slowest first; juFFTe's nx is the contiguous one.
+// As in FFTW, dimensions are given slowest first, the reverse of the native API, where nx
+// is the contiguous one: (n0, n1) here is zfft2d(n1, n0).
 fftw_plan fftw_plan_dft_2d(int n0, int n1, fftw_complex *in, fftw_complex *out, int dir, int flag)
 {
     fftw_plan p = plan_alloc(2, n1, n0, 1, in, out, dir, flag);

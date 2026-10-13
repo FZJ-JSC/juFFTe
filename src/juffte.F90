@@ -68,7 +68,8 @@ if (juffte_initialized .eqv. .false. ) then
 
     end function fftw_plan_dft_1d
 
-    ! As in FFTW, dimensions are given slowest first: a(nx, ny) is planned as (ny, nx).
+    ! As in FFTW, dimensions are given slowest first, the reverse of the native API:
+    ! a(nx, ny) is planned as (ny, nx), which is zfft2d(a, nx, ny).
     type(C_PTR) function fftw_plan_dft_2d(n0,n1,input,output,sign,flags)
         implicit none
 

@@ -71,7 +71,9 @@ int main(int argc, char **argv)
                 printf("%3d %3d %3d: %12.6f  %12.6f\n", i+1, j+1, k+1, in[idx][0], in[idx][1]);
             }
 
-    /* Create FFT plan: complex-to-complex forward transform */
+    /* Create FFT plan: complex-to-complex forward transform. FFTW takes the dimensions
+       slowest first, nz being contiguous here. juFFTe's native API takes them the other
+       way round; the same transform is zfft3d_c(in, nz, ny, nx, ...). */
     plan = fftw_plan_dft_3d(nx, ny, nz, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
 
     /* Execute FFT */

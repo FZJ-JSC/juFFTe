@@ -41,3 +41,7 @@ To use juFFTe instead of FFTW, as `fftw-test*.c` do:
 1. Replace `#include <fftw3.h>` with `#include <juffte.h>`.
 2. Link `-ljuffte -lm -lgfortran` instead of `-lfftw3`.
 3. Recompile.
+
+The FFTW calls keep FFTW's dimension order, slowest first: `fftw_plan_dft_2d(n0, n1, ...)` has
+`n1` contiguous. juFFTe's native API takes the dimensions the other way round, contiguous first:
+the same transform is `zfft2d_c(a, n1, n0, ...)`.

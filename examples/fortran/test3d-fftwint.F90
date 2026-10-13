@@ -46,7 +46,9 @@ program test3d
     call dump(a, n)
 
     a_in = a(1:n)
-    ! As in FFTW, dimensions are given slowest first: a(nx, ny, nz) is planned as (nz, ny, nx).
+    ! FFTW takes the dimensions slowest first, the reverse of the declared shape:
+    ! a(nx, ny, nz) is planned as (nz, ny, nx). juFFTe's native zfft3d(a, nx, ny, nz, ...)
+    ! keeps the declared order.
     plan = fftw_plan_dft_3d(nz, ny, nx, a, a_out, FFTW_FORWARD, FFTW_ESTIMATE)
    call fftw_execute_dft(plan, a, a_out)
     call fftw_destroy_plan(plan)

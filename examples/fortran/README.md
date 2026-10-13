@@ -46,5 +46,6 @@ To use juFFTe instead of FFTW, as `*-fftwint.F90` do:
 2. Replace `-lfftw3` with `-ljuffte` in your Makefile.
 3. Recompile.
 
-As in FFTW, the plan takes the dimensions slowest first: `a(nx, ny)` is planned as
-`fftw_plan_dft_2d(ny, nx, ...)`.
+The FFTW calls keep FFTW's dimension order, slowest first, which in Fortran is the reverse of
+the declared shape: `a(nx, ny)` is planned as `fftw_plan_dft_2d(ny, nx, ...)`. juFFTe's native
+API keeps the declared order: `zfft2d(a, nx, ny, ...)`.
