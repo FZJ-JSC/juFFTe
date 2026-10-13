@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <riscv_vector.h>
 
-void dft9b_r32_(float *Y, float *X, float *TW1, int64_t *lp1, int64_t *mp1) {
+void dft9b_r32_(float *Y, float *X, float *TW1, int *lp1, int *mp1) {
     float a888, a889, a890, a891, a892, a893, a894, a895, 
             a896, a897, a898, a899, a900, a901, a902, a903;
     int64_t a886, a887, j1, l1, m1;

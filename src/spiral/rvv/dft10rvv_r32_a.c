@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <riscv_vector.h>
 
-void dft10a_r32_(float *Y, float *X, float *TW1, int64_t *lp1) {
+void dft10a_r32_(float *Y, float *X, float *TW1, int *lp1) {
     int64_t l1;
     float *a1022;
     vfloat32m1x2_t r71, r72, r73, r74, r75, r76, r77, r78, 
@@ -196,61 +196,61 @@ void dft10a_r32_(float *Y, float *X, float *TW1, int64_t *lp1) {
         s574 = __riscv_vfsub(t1339, s550, vl1);
         s575 = __riscv_vfadd(t1340, s551, vl1);
         a1022 = (TW1 + ((18)*(j1)));
-        a1023 = __riscv_vlse32_v_f32m1(a1022, sizeof(double) * 18, vl1);
-        a1024 = __riscv_vlse32_v_f32m1((a1022 + 1), sizeof(double) * 18, vl1);
+        a1023 = __riscv_vlse32_v_f32m1(a1022, sizeof(float) * 18, vl1);
+        a1024 = __riscv_vlse32_v_f32m1((a1022 + 1), sizeof(float) * 18, vl1);
         s576 = __riscv_vfmsac(__riscv_vfmul(a1024, s561, vl1), a1023, s560, vl1);
         s577 = __riscv_vfmacc(__riscv_vfmul(a1023, s561, vl1), a1024, s560, vl1);
-        a1025 = __riscv_vlse32_v_f32m1((a1022 + 2), sizeof(double) * 18, vl1);
-        a1026 = __riscv_vlse32_v_f32m1((a1022 + 3), sizeof(double) * 18, vl1);
+        a1025 = __riscv_vlse32_v_f32m1((a1022 + 2), sizeof(float) * 18, vl1);
+        a1026 = __riscv_vlse32_v_f32m1((a1022 + 3), sizeof(float) * 18, vl1);
         s578 = __riscv_vfmsac(__riscv_vfmul(a1026, s565, vl1), a1025, s564, vl1);
         s579 = __riscv_vfmacc(__riscv_vfmul(a1025, s565, vl1), a1026, s564, vl1);
-        a1027 = __riscv_vlse32_v_f32m1((a1022 + 4), sizeof(double) * 18, vl1);
-        a1028 = __riscv_vlse32_v_f32m1((a1022 + 5), sizeof(double) * 18, vl1);
+        a1027 = __riscv_vlse32_v_f32m1((a1022 + 4), sizeof(float) * 18, vl1);
+        a1028 = __riscv_vlse32_v_f32m1((a1022 + 5), sizeof(float) * 18, vl1);
         s580 = __riscv_vfmsac(__riscv_vfmul(a1028, s569, vl1), a1027, s568, vl1);
         s581 = __riscv_vfmacc(__riscv_vfmul(a1027, s569, vl1), a1028, s568, vl1);
-        a1029 = __riscv_vlse32_v_f32m1((a1022 + 6), sizeof(double) * 18, vl1);
-        a1030 = __riscv_vlse32_v_f32m1((a1022 + 7), sizeof(double) * 18, vl1);
+        a1029 = __riscv_vlse32_v_f32m1((a1022 + 6), sizeof(float) * 18, vl1);
+        a1030 = __riscv_vlse32_v_f32m1((a1022 + 7), sizeof(float) * 18, vl1);
         s582 = __riscv_vfmsac(__riscv_vfmul(a1030, s573, vl1), a1029, s572, vl1);
         s583 = __riscv_vfmacc(__riscv_vfmul(a1029, s573, vl1), a1030, s572, vl1);
-        a1031 = __riscv_vlse32_v_f32m1((a1022 + 8), sizeof(double) * 18, vl1);
-        a1032 = __riscv_vlse32_v_f32m1((a1022 + 9), sizeof(double) * 18, vl1);
+        a1031 = __riscv_vlse32_v_f32m1((a1022 + 8), sizeof(float) * 18, vl1);
+        a1032 = __riscv_vlse32_v_f32m1((a1022 + 9), sizeof(float) * 18, vl1);
         s584 = __riscv_vfmsac(__riscv_vfmul(a1032, s559, vl1), a1031, s558, vl1);
         s585 = __riscv_vfmacc(__riscv_vfmul(a1031, s559, vl1), a1032, s558, vl1);
-        a1033 = __riscv_vlse32_v_f32m1((a1022 + 10), sizeof(double) * 18, vl1);
-        a1034 = __riscv_vlse32_v_f32m1((a1022 + 11), sizeof(double) * 18, vl1);
+        a1033 = __riscv_vlse32_v_f32m1((a1022 + 10), sizeof(float) * 18, vl1);
+        a1034 = __riscv_vlse32_v_f32m1((a1022 + 11), sizeof(float) * 18, vl1);
         s586 = __riscv_vfmsac(__riscv_vfmul(a1034, s563, vl1), a1033, s562, vl1);
         s587 = __riscv_vfmacc(__riscv_vfmul(a1033, s563, vl1), a1034, s562, vl1);
-        a1035 = __riscv_vlse32_v_f32m1((a1022 + 12), sizeof(double) * 18, vl1);
-        a1036 = __riscv_vlse32_v_f32m1((a1022 + 13), sizeof(double) * 18, vl1);
+        a1035 = __riscv_vlse32_v_f32m1((a1022 + 12), sizeof(float) * 18, vl1);
+        a1036 = __riscv_vlse32_v_f32m1((a1022 + 13), sizeof(float) * 18, vl1);
         s588 = __riscv_vfmsac(__riscv_vfmul(a1036, s567, vl1), a1035, s566, vl1);
         s589 = __riscv_vfmacc(__riscv_vfmul(a1035, s567, vl1), a1036, s566, vl1);
-        a1037 = __riscv_vlse32_v_f32m1((a1022 + 14), sizeof(double) * 18, vl1);
-        a1038 = __riscv_vlse32_v_f32m1((a1022 + 15), sizeof(double) * 18, vl1);
+        a1037 = __riscv_vlse32_v_f32m1((a1022 + 14), sizeof(float) * 18, vl1);
+        a1038 = __riscv_vlse32_v_f32m1((a1022 + 15), sizeof(float) * 18, vl1);
         s590 = __riscv_vfmsac(__riscv_vfmul(a1038, s571, vl1), a1037, s570, vl1);
         s591 = __riscv_vfmacc(__riscv_vfmul(a1037, s571, vl1), a1038, s570, vl1);
-        a1039 = __riscv_vlse32_v_f32m1((a1022 + 16), sizeof(double) * 18, vl1);
-        a1040 = __riscv_vlse32_v_f32m1((a1022 + 17), sizeof(double) * 18, vl1);
+        a1039 = __riscv_vlse32_v_f32m1((a1022 + 16), sizeof(float) * 18, vl1);
+        a1040 = __riscv_vlse32_v_f32m1((a1022 + 17), sizeof(float) * 18, vl1);
         s592 = __riscv_vfmsac(__riscv_vfmul(a1040, s575, vl1), a1039, s574, vl1);
         s593 = __riscv_vfmacc(__riscv_vfmul(a1039, s575, vl1), a1040, s574, vl1);
-        __riscv_vsse32((Y + ((20)*(j1))), sizeof(double) * 20, s556, vl1);
-        __riscv_vsse32((1 + Y + ((20)*(j1))), sizeof(double) * 20, s557, vl1);
-        __riscv_vsse32((2 + Y + ((20)*(j1))), sizeof(double) * 20, s576, vl1);
-        __riscv_vsse32((3 + Y + ((20)*(j1))), sizeof(double) * 20, s577, vl1);
-        __riscv_vsse32((4 + Y + ((20)*(j1))), sizeof(double) * 20, s578, vl1);
-        __riscv_vsse32((5 + Y + ((20)*(j1))), sizeof(double) * 20, s579, vl1);
-        __riscv_vsse32((6 + Y + ((20)*(j1))), sizeof(double) * 20, s580, vl1);
-        __riscv_vsse32((7 + Y + ((20)*(j1))), sizeof(double) * 20, s581, vl1);
-        __riscv_vsse32((8 + Y + ((20)*(j1))), sizeof(double) * 20, s582, vl1);
-        __riscv_vsse32((9 + Y + ((20)*(j1))), sizeof(double) * 20, s583, vl1);
-        __riscv_vsse32((10 + Y + ((20)*(j1))), sizeof(double) * 20, s584, vl1);
-        __riscv_vsse32((11 + Y + ((20)*(j1))), sizeof(double) * 20, s585, vl1);
-        __riscv_vsse32((12 + Y + ((20)*(j1))), sizeof(double) * 20, s586, vl1);
-        __riscv_vsse32((13 + Y + ((20)*(j1))), sizeof(double) * 20, s587, vl1);
-        __riscv_vsse32((14 + Y + ((20)*(j1))), sizeof(double) * 20, s588, vl1);
-        __riscv_vsse32((15 + Y + ((20)*(j1))), sizeof(double) * 20, s589, vl1);
-        __riscv_vsse32((16 + Y + ((20)*(j1))), sizeof(double) * 20, s590, vl1);
-        __riscv_vsse32((17 + Y + ((20)*(j1))), sizeof(double) * 20, s591, vl1);
-        __riscv_vsse32((18 + Y + ((20)*(j1))), sizeof(double) * 20, s592, vl1);
-        __riscv_vsse32((19 + Y + ((20)*(j1))), sizeof(double) * 20, s593, vl1);
+        __riscv_vsse32((Y + ((20)*(j1))), sizeof(float) * 20, s556, vl1);
+        __riscv_vsse32((1 + Y + ((20)*(j1))), sizeof(float) * 20, s557, vl1);
+        __riscv_vsse32((2 + Y + ((20)*(j1))), sizeof(float) * 20, s576, vl1);
+        __riscv_vsse32((3 + Y + ((20)*(j1))), sizeof(float) * 20, s577, vl1);
+        __riscv_vsse32((4 + Y + ((20)*(j1))), sizeof(float) * 20, s578, vl1);
+        __riscv_vsse32((5 + Y + ((20)*(j1))), sizeof(float) * 20, s579, vl1);
+        __riscv_vsse32((6 + Y + ((20)*(j1))), sizeof(float) * 20, s580, vl1);
+        __riscv_vsse32((7 + Y + ((20)*(j1))), sizeof(float) * 20, s581, vl1);
+        __riscv_vsse32((8 + Y + ((20)*(j1))), sizeof(float) * 20, s582, vl1);
+        __riscv_vsse32((9 + Y + ((20)*(j1))), sizeof(float) * 20, s583, vl1);
+        __riscv_vsse32((10 + Y + ((20)*(j1))), sizeof(float) * 20, s584, vl1);
+        __riscv_vsse32((11 + Y + ((20)*(j1))), sizeof(float) * 20, s585, vl1);
+        __riscv_vsse32((12 + Y + ((20)*(j1))), sizeof(float) * 20, s586, vl1);
+        __riscv_vsse32((13 + Y + ((20)*(j1))), sizeof(float) * 20, s587, vl1);
+        __riscv_vsse32((14 + Y + ((20)*(j1))), sizeof(float) * 20, s588, vl1);
+        __riscv_vsse32((15 + Y + ((20)*(j1))), sizeof(float) * 20, s589, vl1);
+        __riscv_vsse32((16 + Y + ((20)*(j1))), sizeof(float) * 20, s590, vl1);
+        __riscv_vsse32((17 + Y + ((20)*(j1))), sizeof(float) * 20, s591, vl1);
+        __riscv_vsse32((18 + Y + ((20)*(j1))), sizeof(float) * 20, s592, vl1);
+        __riscv_vsse32((19 + Y + ((20)*(j1))), sizeof(float) * 20, s593, vl1);
     }
 }

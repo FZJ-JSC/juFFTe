@@ -24,224 +24,78 @@ subroutine fft235_o(a, b, w, n, ip, a_out)
 
     complex(real64), intent(inout) :: a(*), b(*), w(*)
     complex(real64), intent(out)   :: a_out(*)
-
     integer, intent(in) :: ip(*), n
-    integer :: j, k, key, kp4, kp8, l, m
+    integer, parameter :: radix(11) = [16, 15, 12, 10, 9, 8, 6, 5, 4, 3, 2]
+    integer :: i, j, k, key, l, m, nleft
 
-    key = 1
+    ! The input a is only read, by the first stage. The other stages alternate
+    ! between b and a_out, arranged so that the last stage reads b and writes a_out.
+    ! key: where the data is now (0 = a, 1 = b, 2 = a_out).
+    ! nleft: stages still to run, including the current one.
+    nleft = sum(ip(radix))
+    if (nleft == 0) a_out(1) = a(1)  ! n = 1
+    key = 0
     j = 1
     l = n
     m = 1
-    do k = 1, ip(16)
-        l = l/16
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft16(a, b, w(j), m, l)
-            else
-                call fft16(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft16(a, a_out, w(j), m, l)
-            else
-                call fft16(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*16
-        j = j + l*15
-    end do
-    do k = 1, ip(15)
-        l = l/15
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft15(a, b, w(j), m, l)
-            else
-                call fft15(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft15(a, a_out, w(j), m, l)
-            else
-                call fft15(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*15
-        j = j + l*14
-    end do
-    do k = 1, ip(12)
-        l = l/12
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft12(a, b, w(j), m, l)
-            else
-                call fft12(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft12(a, a_out, w(j), m, l)
-            else
-                call fft12(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*12
-        j = j + l*11
-    end do
-    do k = 1, ip(10)
-        l = l/10
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft10(a, b, w(j), m, l)
-            else
-                call fft10(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft10(a, a_out, w(j), m, l)
-            else
-                call fft10(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*10
-        j = j + l*9
-    end do
-    do k = 1, ip(9)
-        l = l/9
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft9(a, b, w(j), m, l)
-            else
-                call fft9(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft9(a, a_out, w(j), m, l)
-            else
-                call fft9(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*9
-        j = j + l*8
-    end do
-    do k = 1, ip(8)
-        l = l/8
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft8(a, b, w(j), m, l)
-            else
-                call fft8(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft8(a, a_out, w(j), m, l)
-            else
-                call fft8(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*8
-        j = j + l*7
-    end do
-    do k = 1, ip(6)
-        l = l/6
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft6(a, b, w(j), m, l)
-            else
-                call fft6(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft6(a, a_out, w(j), m, l)
-            else
-                call fft6(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*6
-        j = j + l*5
-    end do
-    do k = 1, ip(5)
-        l = l/5
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft5(a, b, w(j), m, l)
-            else
-                call fft5(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft5(a, a_out, w(j), m, l)
-            else
-                call fft5(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*5
-        j = j + l*4
-    end do
-    do k = 1, ip(4)
-        l = l/4
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft4(a, b, w(j), m, l)
-            else
-                call fft4(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft4(a, a_out, w(j), m, l)
-            else
-                call fft4(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*4
-        j = j + l*3
-    end do
-    do k = 1, ip(3)
-        l = l/3
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft3(a, b, w(j), m, l)
-            else
-                call fft3(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft3(a, a_out, w(j), m, l)
-            else
-                call fft3(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*3
-        j = j + l*2
-    end do
-    do k = 1, ip(2)
-        l = l/2
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft2(a, b, w(j), m, l)
-            else
-                call fft2(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft2(a, a_out, w(j), m, l)
-            else
-                call fft2(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*2
-        j = j + l
+    do i = 1, size(radix)
+        do k = 1, ip(radix(i))
+            l = l/radix(i)
+            call stage(radix(i))
+            m = m*radix(i)
+            j = j + l*(radix(i) - 1)
+        end do
     end do
     return
+
+contains
+
+    subroutine stage(r)
+        integer, intent(in) :: r
+
+        if (nleft == 1) then                ! last stage: write a_out
+            if (key == 0) then
+                call kernel(r, a, a_out)
+            else
+                call kernel(r, b, a_out)    ! key == 1
+            end if
+        else if (mod(nleft, 2) == 0) then   ! even number left: write b
+            if (key == 0) then
+                call kernel(r, a, b)
+            else
+                call kernel(r, a_out, b)    ! key == 2
+            end if
+            key = 1
+        else                                ! odd number left: write a_out
+            if (key == 0) then
+                call kernel(r, a, a_out)
+            else
+                call kernel(r, b, a_out)    ! key == 1
+            end if
+            key = 2
+        end if
+        nleft = nleft - 1
+    end subroutine stage
+
+    subroutine kernel(r, x, y)
+        integer, intent(in) :: r
+        complex(real64), intent(inout) :: x(*), y(*)
+
+        select case (r)
+        case (16); call fft16(x, y, w(j), m, l)
+        case (15); call fft15(x, y, w(j), m, l)
+        case (12); call fft12(x, y, w(j), m, l)
+        case (10); call fft10(x, y, w(j), m, l)
+        case (9);  call fft9(x, y, w(j), m, l)
+        case (8);  call fft8(x, y, w(j), m, l)
+        case (6);  call fft6(x, y, w(j), m, l)
+        case (5);  call fft5(x, y, w(j), m, l)
+        case (4);  call fft4(x, y, w(j), m, l)
+        case (3);  call fft3(x, y, w(j), m, l)
+        case (2);  call fft2(x, y, w(j), m, l)
+        end select
+    end subroutine kernel
+
 end subroutine fft235_o
 
 subroutine fft235(a, b, w, n, ip)
@@ -747,224 +601,78 @@ subroutine fft235_o_r32(a, b, w, n, ip, a_out)
 
     complex(real32), intent(inout) :: a(*), b(*), w(*)
     complex(real32), intent(out)   :: a_out(*)
-
     integer, intent(in) :: ip(*), n
-    integer :: j, k, key, kp4, kp8, l, m
+    integer, parameter :: radix(11) = [16, 15, 12, 10, 9, 8, 6, 5, 4, 3, 2]
+    integer :: i, j, k, key, l, m, nleft
 
-    key = 1
+    ! The input a is only read, by the first stage. The other stages alternate
+    ! between b and a_out, arranged so that the last stage reads b and writes a_out.
+    ! key: where the data is now (0 = a, 1 = b, 2 = a_out).
+    ! nleft: stages still to run, including the current one.
+    nleft = sum(ip(radix))
+    if (nleft == 0) a_out(1) = a(1)  ! n = 1
+    key = 0
     j = 1
     l = n
     m = 1
-    do k = 1, ip(16)
-        l = l/16
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft16_r32(a, b, w(j), m, l)
-            else
-                call fft16_r32(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft16_r32(a, a_out, w(j), m, l)
-            else
-                call fft16_r32(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*16
-        j = j + l*15
-    end do
-    do k = 1, ip(15)
-        l = l/15
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft15_r32(a, b, w(j), m, l)
-            else
-                call fft15_r32(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft15_r32(a, a_out, w(j), m, l)
-            else
-                call fft15_r32(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*15
-        j = j + l*14
-    end do
-    do k = 1, ip(12)
-        l = l/12
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft12_r32(a, b, w(j), m, l)
-            else
-                call fft12_r32(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft12_r32(a, a_out, w(j), m, l)
-            else
-                call fft12_r32(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*12
-        j = j + l*11
-    end do
-    do k = 1, ip(10)
-        l = l/10
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft10_r32(a, b, w(j), m, l)
-            else
-                call fft10_r32(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft10_r32(a, a_out, w(j), m, l)
-            else
-                call fft10_r32(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*10
-        j = j + l*9
-    end do
-    do k = 1, ip(9)
-        l = l/9
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft9_r32(a, b, w(j), m, l)
-            else
-                call fft9_r32(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft9_r32(a, a_out, w(j), m, l)
-            else
-                call fft9_r32(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*9
-        j = j + l*8
-    end do
-    do k = 1, ip(8)
-        l = l/8
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft8_r32(a, b, w(j), m, l)
-            else
-                call fft8_r32(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft8_r32(a, a_out, w(j), m, l)
-            else
-                call fft8_r32(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*8
-        j = j + l*7
-    end do
-    do k = 1, ip(6)
-        l = l/6
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft6_r32(a, b, w(j), m, l)
-            else
-                call fft6_r32(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft6_r32(a, a_out, w(j), m, l)
-            else
-                call fft6_r32(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*6
-        j = j + l*5
-    end do
-    do k = 1, ip(5)
-        l = l/5
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft5_r32(a, b, w(j), m, l)
-            else
-                call fft5_r32(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft5_r32(a, a_out, w(j), m, l)
-            else
-                call fft5_r32(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*5
-        j = j + l*4
-    end do
-    do k = 1, ip(4)
-        l = l/4
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft4_r32(a, b, w(j), m, l)
-            else
-                call fft4_r32(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft4_r32(a, a_out, w(j), m, l)
-            else
-                call fft4_r32(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*4
-        j = j + l*3
-    end do
-    do k = 1, ip(3)
-        l = l/3
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft3_r32(a, b, w(j), m, l)
-            else
-                call fft3_r32(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft3_r32(a, a_out, w(j), m, l)
-            else
-                call fft3_r32(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*3
-        j = j + l*2
-    end do
-    do k = 1, ip(2)
-        l = l/2
-        if (l >= 2) then
-            if (key >= 0) then
-                call fft2_r32(a, b, w(j), m, l)
-            else
-                call fft2_r32(b, a, w(j), m, l)
-            end if
-            key = -key
-        else
-            if (key >= 0) then
-                call fft2_r32(a, a_out, w(j), m, l)
-            else
-                call fft2_r32(b, a_out, w(j), m, l)
-            end if
-        end if
-        m = m*2
-        j = j + l
+    do i = 1, size(radix)
+        do k = 1, ip(radix(i))
+            l = l/radix(i)
+            call stage(radix(i))
+            m = m*radix(i)
+            j = j + l*(radix(i) - 1)
+        end do
     end do
     return
+
+contains
+
+    subroutine stage(r)
+        integer, intent(in) :: r
+
+        if (nleft == 1) then                ! last stage: write a_out
+            if (key == 0) then
+                call kernel(r, a, a_out)
+            else
+                call kernel(r, b, a_out)    ! key == 1
+            end if
+        else if (mod(nleft, 2) == 0) then   ! even number left: write b
+            if (key == 0) then
+                call kernel(r, a, b)
+            else
+                call kernel(r, a_out, b)    ! key == 2
+            end if
+            key = 1
+        else                                ! odd number left: write a_out
+            if (key == 0) then
+                call kernel(r, a, a_out)
+            else
+                call kernel(r, b, a_out)    ! key == 1
+            end if
+            key = 2
+        end if
+        nleft = nleft - 1
+    end subroutine stage
+
+    subroutine kernel(r, x, y)
+        integer, intent(in) :: r
+        complex(real32), intent(inout) :: x(*), y(*)
+
+        select case (r)
+        case (16); call fft16_r32(x, y, w(j), m, l)
+        case (15); call fft15_r32(x, y, w(j), m, l)
+        case (12); call fft12_r32(x, y, w(j), m, l)
+        case (10); call fft10_r32(x, y, w(j), m, l)
+        case (9);  call fft9_r32(x, y, w(j), m, l)
+        case (8);  call fft8_r32(x, y, w(j), m, l)
+        case (6);  call fft6_r32(x, y, w(j), m, l)
+        case (5);  call fft5_r32(x, y, w(j), m, l)
+        case (4);  call fft4_r32(x, y, w(j), m, l)
+        case (3);  call fft3_r32(x, y, w(j), m, l)
+        case (2);  call fft2_r32(x, y, w(j), m, l)
+        end select
+    end subroutine kernel
+
 end subroutine fft235_o_r32
 
 subroutine fft235_r32(a, b, w, n, ip)

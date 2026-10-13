@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <riscv_vector.h>
 
-void dft12c_r32_(float *Y, float *X, int64_t *lp1, int64_t *mp1) {
+void dft12c_r32_(float *Y, float *X, int *lp1, int *mp1) {
     int64_t l1, m1;
     vfloat32m1x2_t r193, r194, r195, r196, r197, r198, r199, r200, 
             r201, r202, r203, r204, r205, r206, r207, r208, 
