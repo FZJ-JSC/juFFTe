@@ -37,7 +37,7 @@ subroutine zdfft3d_64(a, a_r, nx, ny, nz, iopt)
     complex(real64) :: c((NDA3 + NP)*NBLK), d(NDA3)
     complex(real64), save :: wx(NDA3), wy(NDA3), wz(NDA3)
 #ifdef SPRL
-    integer :: lnx(16), lny(16), lnz(16)
+    integer, save :: lnx(16), lny(16), lnz(16)
 #else
     integer :: lnx(3), lny(3), lnz(3)
 #endif
@@ -195,7 +195,7 @@ subroutine zdfft3d_32(a, a_r, nx, ny, nz, iopt)
     complex(real32) :: c((NDA3 + NP)*NBLK), d(NDA3)
     complex(real32), save :: wx(NDA3), wy(NDA3), wz(NDA3)
 #ifdef SPRL
-    integer :: lnx(16), lny(16), lnz(16)
+    integer, save :: lnx(16), lny(16), lnz(16)
 #else
     integer :: lnx(3), lny(3), lnz(3)
 #endif

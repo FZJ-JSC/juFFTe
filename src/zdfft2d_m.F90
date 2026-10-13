@@ -39,7 +39,7 @@ subroutine zdfft2d_64(a, a_r, nx, ny, iopt)
     complex(real64) :: d(NDA2)
     complex(real64), save :: wx(NDA2), wy(NDA2)
 #ifdef SPRL
-    integer :: lnx(16), lny(16)
+    integer, save :: lnx(16), lny(16)
 #else
     integer :: lnx(3), lny(3)
 #endif
@@ -158,7 +158,7 @@ subroutine zdfft2d_32(a, a_r, nx, ny, iopt)
     complex(real32) :: d(NDA2)
     complex(real32), save :: wx(NDA2), wy(NDA2)
 #ifdef SPRL
-    integer :: lnx(16), lny(16)
+    integer, save :: lnx(16), lny(16)
 #else
     integer :: lnx(3), lny(3)
 #endif
