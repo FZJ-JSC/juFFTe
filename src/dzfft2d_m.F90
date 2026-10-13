@@ -48,6 +48,8 @@ subroutine dzfft2d_64(a, a_c, nx, ny, iopt)
 #endif
 
     if (iopt == juffte_init) then
+        call check_size('dzfft2d', nx, NDA2)
+        call check_size('dzfft2d', ny, NDA2)
 
         allocate (b(nx*ny*2))
 !$OMP PARALLEL
@@ -157,6 +159,8 @@ subroutine dzfft2d_32(a, a_c, nx, ny, iopt)
 #endif
 
     if (iopt == juffte_init) then
+        call check_size('dzfft2d', nx, NDA2)
+        call check_size('dzfft2d', ny, NDA2)
         allocate (b_r32(nx*ny*2))
         !$OMP PARALLEL
         allocate(c_r32((NDA2 + NP)*NBLK))

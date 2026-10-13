@@ -44,6 +44,7 @@ subroutine zfft1d_64(a, n, iopt, out)
     integer                          :: i, nx, ny
 
     if (iopt == juffte_init) then
+        call check_size('zfft1d', n)
         allocate(b(n*2))
     end if
 
@@ -208,6 +209,7 @@ subroutine zfft1d_32(a, n, iopt, out)
     integer                          :: i, nx, ny
 
     if (iopt == juffte_init) then
+        call check_size('zfft1d', n)
         allocate(b_r32(n*2))
     end if
 

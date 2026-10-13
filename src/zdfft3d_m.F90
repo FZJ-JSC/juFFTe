@@ -44,6 +44,9 @@ subroutine zdfft3d_64(a, a_r, nx, ny, nz, iopt)
 
 
     if (iopt == juffte_init) then
+        call check_size('zdfft3d', nx, NDA3)
+        call check_size('zdfft3d', ny, NDA3)
+        call check_size('zdfft3d', nz, NDA3)
         allocate (b(nx*ny*nz*2))
 #ifdef SPRL
         call factor2(nx,lnx)
@@ -202,6 +205,9 @@ subroutine zdfft3d_32(a, a_r, nx, ny, nz, iopt)
 
 
     if (iopt == juffte_init) then
+        call check_size('zdfft3d', nx, NDA3)
+        call check_size('zdfft3d', ny, NDA3)
+        call check_size('zdfft3d', nz, NDA3)
         allocate (b_r32(nx*ny*nz*2))
 #ifdef SPRL
         call factor2(nx,lnx)
