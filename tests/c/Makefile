@@ -55,6 +55,7 @@ ifeq ($(THOROUGH), 1)
     SIZES_1D += $(THOROUGH_1D)
     SIZES_2D += $(THOROUGH_2D)
     SIZES_3D += $(THOROUGH_3D)
+    SIZES_SIXSTEP += $(THOROUGH_SIXSTEP)
 endif
 T = ./juffte_test_c
 
@@ -65,7 +66,10 @@ test : juffte_test_c
 	        t -t complex -d $$d -a fftw $$s; done; \
 	    for s in $(SIZES_2D) $(SIZES_3D); do t -t complex -d $$d $$s; t -t real -d $$d $$s; \
 	        t -t complex -d $$d -a fftw $$s; done; \
-	done
+	    for s in $(SIZES_SIXSTEP); do t -t complex -d $$d $$s; t -t complex -d $$d -a fftw $$s; \
+	        done; \
+	done; \
+	$(T) 14 2>&1 | grep 'length 14 is not a product of 2, 3 and 5'
 
 clean:
 	rm -f juffte_test_c *.o
