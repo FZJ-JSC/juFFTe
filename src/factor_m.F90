@@ -10,12 +10,40 @@ implicit none
 
 private
 #ifdef SPRL
-public  :: factor, factor2, getnxny
+public  :: factor, factor2, getnxny, check_size
 #else
-public  :: factor, getnxny
+public  :: factor, getnxny, check_size
 #endif
 
 contains
+
+! Stops with a message unless n is a product of 2, 3 and 5 and at most cap. Any other
+! length gives wrong results or overruns the fixed-size tables.
+subroutine check_size(routine, n, cap)
+    implicit none
+    character(len=*), intent(in) :: routine
+    integer, intent(in) :: n
+    integer, intent(in), optional :: cap
+    integer, parameter :: primes(3) = [2, 3, 5]
+    integer :: m, i
+
+    m = n
+    do i = 1, 3
+        do while (m > 1 .and. mod(m, primes(i)) == 0)
+            m = m/primes(i)
+        end do
+    end do
+    if (n < 1 .or. m /= 1) then
+        write(error_unit, '(a,": length ",i0," is not a product of 2, 3 and 5")') routine, n
+        error stop 1
+    end if
+    if (present(cap)) then
+        if (n > cap) then
+            write(error_unit, '(a,": length ",i0," exceeds the maximum ",i0)') routine, n, cap
+            error stop 1
+        end if
+    end if
+end subroutine check_size
 
 subroutine factor(n, ip)
     implicit none

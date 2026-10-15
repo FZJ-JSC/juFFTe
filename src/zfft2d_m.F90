@@ -48,6 +48,8 @@ subroutine zfft2d_64(a, nx, ny, iopt, out)
 
 
     if (iopt == juffte_init) then
+        call check_size('zfft2d', nx, NDA2)
+        call check_size('zfft2d', ny, NDA2)
 ! b is THREADPRIVATE: every thread needs its own allocation.
 !$OMP PARALLEL
     allocate (b((NDA2 + NP)*NBLK))
@@ -197,6 +199,8 @@ subroutine zfft2d_32(a, nx, ny, iopt, out)
 
 
     if (iopt == juffte_init) then
+        call check_size('zfft2d', nx, NDA2)
+        call check_size('zfft2d', ny, NDA2)
 ! b_r32 is THREADPRIVATE: every thread needs its own allocation.
 !$OMP PARALLEL
        allocate (b_r32((NDA2 + NP)*NBLK))

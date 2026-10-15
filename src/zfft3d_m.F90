@@ -43,6 +43,9 @@ subroutine zfft3d_64(a, nx, ny, nz, iopt, out)
     integer                                :: i
 
     if (iopt == juffte_init) then
+        call check_size('zfft3d', nx, NDA3)
+        call check_size('zfft3d', ny, NDA3)
+        call check_size('zfft3d', nz, NDA3)
 #ifdef SPRL
     call factor2(nx,lnx)
     call factor2(ny,lny)
@@ -239,6 +242,9 @@ subroutine zfft3d_32(a, nx, ny, nz, iopt, out)
     integer                                :: i
 
     if (iopt == juffte_init) then
+        call check_size('zfft3d', nx, NDA3)
+        call check_size('zfft3d', ny, NDA3)
+        call check_size('zfft3d', nz, NDA3)
 #ifdef SPRL
     call factor2(nx,lnx)
     call factor2(ny,lny)

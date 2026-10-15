@@ -33,7 +33,7 @@ subroutine zfft1d_64(a, n, iopt, out)
     complex(real64), intent(inout)        :: a(*)
     complex(real64), optional,intent(out) :: out(*)
     integer, intent(in)              :: n, iopt
-    complex(real64)                       :: c((NDA2 + NP)*NBLK), d(NDA2)
+    complex(real64), allocatable          :: c(:), d(:)
 #ifdef SPRL
     integer,save                     :: ip(16), lnx(16), lny(16)
 #else
@@ -44,6 +44,7 @@ subroutine zfft1d_64(a, n, iopt, out)
     integer                          :: i, nx, ny
 
     if (iopt == juffte_init) then
+        call check_size('zfft1d', n)
         allocate(b(n*2))
     end if
 
@@ -102,15 +103,19 @@ subroutine zfft1d_64(a, n, iopt, out)
                     call factor(ny, lny)
 #endif
 
-                    if (present(out)) then
+                    ! Per-thread work arrays on the heap: as fixed-size locals they took
+                    ! ~17 MB of stack. Out of place backward, out already holds conj(a).
 !$OMP PARALLEL PRIVATE(C,D)
-                        call zfft1d0_64(a, out, b, c, c, d, wx, wy, b(n + 1), nx, ny, lnx, lny)
-!$OMP END PARALLEL
-                    else
-!$OMP PARALLEL PRIVATE(C,D)
+                    allocate(c((max(nx, ny) + NP)*NBLK), d(max(nx, ny)))
+                    if (.not. present(out)) then
                         call zfft1d0_64(a, a, b, c, c, d, wx, wy, b(n + 1), nx, ny, lnx, lny)
-!$OMP END PARALLEL
+                    else if (iopt == juffte_bw) then
+                        call zfft1d0_64(out, out, b, c, c, d, wx, wy, b(n + 1), nx, ny, lnx, lny)
+                    else
+                        call zfft1d0_64(a, out, b, c, c, d, wx, wy, b(n + 1), nx, ny, lnx, lny)
                     end if
+                    deallocate(c, d)
+!$OMP END PARALLEL
     end if
 
     if (present(out)) then
@@ -193,7 +198,7 @@ subroutine zfft1d_32(a, n, iopt, out)
     complex(real32), intent(inout)        :: a(*)
     complex(real32), optional,intent(out) :: out(*)
     integer, intent(in)              :: n, iopt
-    complex(real32)                       :: c((NDA2 + NP)*NBLK), d(NDA2)
+    complex(real32), allocatable          :: c(:), d(:)
 #ifdef SPRL
     integer,save                     :: ip(16), lnx(16), lny(16)
 #else
@@ -204,6 +209,7 @@ subroutine zfft1d_32(a, n, iopt, out)
     integer                          :: i, nx, ny
 
     if (iopt == juffte_init) then
+        call check_size('zfft1d', n)
         allocate(b_r32(n*2))
     end if
 
@@ -262,15 +268,19 @@ subroutine zfft1d_32(a, n, iopt, out)
                     call factor(ny, lny)
 #endif
 
-                    if (present(out)) then
+                    ! Per-thread work arrays on the heap: as fixed-size locals they took
+                    ! ~17 MB of stack. Out of place backward, out already holds conj(a).
 !$OMP PARALLEL PRIVATE(C,D)
-                        call zfft1d0_32(a, out, b_r32, c, c, d, wx, wy, b_r32(n + 1), nx, ny, lnx, lny)
-!$OMP END PARALLEL
-                    else
-!$OMP PARALLEL PRIVATE(C,D)
+                    allocate(c((max(nx, ny) + NP)*NBLK), d(max(nx, ny)))
+                    if (.not. present(out)) then
                         call zfft1d0_32(a, a, b_r32, c, c, d, wx, wy, b_r32(n + 1), nx, ny, lnx, lny)
-!$OMP END PARALLEL
+                    else if (iopt == juffte_bw) then
+                        call zfft1d0_32(out, out, b_r32, c, c, d, wx, wy, b_r32(n + 1), nx, ny, lnx, lny)
+                    else
+                        call zfft1d0_32(a, out, b_r32, c, c, d, wx, wy, b_r32(n + 1), nx, ny, lnx, lny)
                     end if
+                    deallocate(c, d)
+!$OMP END PARALLEL
     end if
 
     if (present(out)) then
