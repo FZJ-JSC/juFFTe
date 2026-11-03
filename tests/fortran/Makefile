@@ -29,8 +29,8 @@ ifneq (,$(filter $(FC),ifort ifx))
 endif
 
 ifneq (,$(filter $(FC),flang flang-new))
-	FCFLAGS = -g -O3 -Wno-ignored-directive   
-	LIBFLAGS = -L $(LIBDIR)  -I $(INCDIR) -ljuffte -ffast-math -mepi -L/apps/riscv/llvm/EPI/development/lib -lprovector-vecclonevp
+	FCFLAGS = -g -O3 -Wno-ignored-directive
+	LIBFLAGS = -L $(LIBDIR)  -I $(INCDIR) -ljuffte
 endif
 
 ifneq (,$(filter $(FC),nvfortran))
@@ -38,6 +38,10 @@ ifneq (,$(filter $(FC),nvfortran))
 	LIBFLAGS = -L $(LIBDIR)  -I $(INCDIR) -ljuffte 
 endif
 
+# Link flags the library needs beyond -ljuffte, such as EPI's vector math library;
+# written by src/Makefile next to the library.
+-include $(LIBDIR)/juffte.mk
+LIBFLAGS += $(JUFFTE_LIBS)
 FCFLAGS  += $(OMPFLAGS) 
 # -mprefer-vector-width=512
 

@@ -32,9 +32,17 @@ Options:
 | `-DTHOROUGH_TESTS=ON`     | Test about a thousand more sizes            |
 | `-DBUILD_EXAMPLES=OFF`    | Skip the programs in `examples/`            |
 | `-DBUILD_SHARED_LIBS=ON`  | Shared instead of static library            |
+| `-DWITH_EPI=OFF`          | Don't use `-mepi` with EPI's LLVM (see below) |
 
 Only the RVV kernels are currently generated: `-DWITHSVE=ON`, and `-DWITHSPRL=ON` on its
 own, stop at configure time until those kernel sets exist.
+
+With EPI's LLVM (BSC), which vectorises for RVV with `-mepi`, the library is built with
+`-mepi -ffast-math` and needs EPI's vector math library `libprovector-vecclonevp`. CMake
+detects the compiler by trying `-mepi`, the Makefile does so when `FC` is `flang` or
+`flang-new`; both look for the library next to the compiler. Point CMake to the library
+file with `-DEPI_VECMATH_LIBRARY=/path/to/libprovector-vecclonevp.so`, the Makefile to its
+directory with `EPI_LIBDIR=/path/to/dir`.
 
 To use a different compiler, for example Intel's:
 
@@ -168,6 +176,10 @@ both the native and the FFTW-compatible API. When using from C/C++, include Fort
 ```
 gcc your_code.c -ljuffte -lm -lgfortran
 ```
+
+A library built with EPI's LLVM also needs `-lprovector-vecclonevp` from the compiler's `lib`
+directory. The CMake package adds it by itself; the Makefile build writes the flags as
+`JUFFTE_LIBS` into `juffte.mk` next to the library, for a Makefile to include.
 
 ## Contributing
 
