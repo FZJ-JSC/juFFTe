@@ -18,6 +18,7 @@ option(WITHRVV "Build with RVV backend" OFF)
 option(WITH_REFERENCE_FFTW "Build the comparisons against a reference FFTW" OFF)
 option(BUILD_EXAMPLES "Build the example programs in examples/" ON)
 option(THOROUGH_TESTS "Test many more sizes (tests/sizes.mk)" OFF)
+option(WITH_EPI "Vectorise with -mepi if the compiler is EPI's LLVM" ON)
 
 # =========================
 # Validate options
@@ -117,9 +118,42 @@ find_package(OpenMP)
 # =========================
 # Detect compiler-specific flags
 # =========================
+# flang warns about each !DIR$ VECTOR ALIGNED it ignores, as in src/Makefile.
 if(CMAKE_Fortran_COMPILER_ID MATCHES "Flang")
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -Wno-ignored-directive -ffast-math -mepi")
-elseif(CMAKE_Fortran_COMPILER_ID MATCHES "NVHPC")
+    add_compile_options("$<$<COMPILE_LANGUAGE:Fortran>:-Wno-ignored-directive>")
+endif()
+
+# EPI's LLVM (BSC) vectorises for RVV with -mepi, which turns the cos/sin loops of the
+# twiddle tables into calls to its vector math library, libprovector-vecclonevp; the
+# library has to link it. Upstream flang rejects -mepi, hence the test instead of the
+# compiler ID.
+set(JUFFTE_EPI OFF)
+if(WITH_EPI)
+    include(CheckFortranCompilerFlag)
+    check_fortran_compiler_flag(-mepi JUFFTE_EPI_COMPILER)
+    set(JUFFTE_EPI "${JUFFTE_EPI_COMPILER}")
+endif()
+if(JUFFTE_EPI)
+    # The library belongs to the toolchain: look next to the real compiler and where it
+    # links its own runtime, not in a cross build's sysroot.
+    get_filename_component(EPI_BIN_DIR ${CMAKE_Fortran_COMPILER} REALPATH)
+    get_filename_component(EPI_BIN_DIR ${EPI_BIN_DIR} DIRECTORY)
+    find_library(EPI_VECMATH_LIBRARY provector-vecclonevp
+        HINTS ${EPI_BIN_DIR}/../lib ${CMAKE_Fortran_IMPLICIT_LINK_DIRECTORIES}
+        NO_CMAKE_FIND_ROOT_PATH)
+    if(NOT EPI_VECMATH_LIBRARY)
+        message(FATAL_ERROR "The EPI compiler needs libprovector-vecclonevp, which is not in "
+                            "${EPI_BIN_DIR}/../lib: set EPI_VECMATH_LIBRARY to its path, or "
+                            "build without -mepi with -DWITH_EPI=OFF.")
+    endif()
+    message(STATUS "EPI compiler: -mepi, linking ${EPI_VECMATH_LIBRARY}")
+    # CMake leaves the directories the compiler links from by default, where EPI's flang
+    # keeps the library, out of the run paths it computes, so name it for a shared one.
+    get_filename_component(EPI_VECMATH_DIR ${EPI_VECMATH_LIBRARY} DIRECTORY)
+    list(APPEND CMAKE_BUILD_RPATH ${EPI_VECMATH_DIR})
+endif()
+
+if(CMAKE_Fortran_COMPILER_ID MATCHES "NVHPC")
     # Placeholder: add NVIDIA Fortran flags if needed
 endif()
 
@@ -229,6 +263,16 @@ if(SPRL_ARCH_FLAG
    AND CMAKE_C_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$"
    AND CMAKE_Fortran_COMPILER_ID MATCHES "^(GNU|Flang|LLVMFlang)$")
     target_compile_options(${LIB_TARGET} PRIVATE ${SPRL_ARCH_FLAG})
+endif()
+
+# PUBLIC: if the user also puts -mepi into CMAKE_<LANG>_FLAGS, as in #22, the tests,
+# the benchmark and their own programs call the vector library too, also when libjuffte
+# is shared. The install RPATH lets an installed shared libjuffte find a shared one.
+if(JUFFTE_EPI)
+    target_compile_options(${LIB_TARGET} PRIVATE
+        "$<$<COMPILE_LANGUAGE:Fortran>:-ffast-math;-mepi>")
+    target_link_libraries(${LIB_TARGET} PUBLIC ${EPI_VECMATH_LIBRARY})
+    set_property(TARGET ${LIB_TARGET} APPEND PROPERTY INSTALL_RPATH ${EPI_VECMATH_DIR})
 endif()
 
 # =========================

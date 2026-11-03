@@ -46,8 +46,27 @@ ifneq (,$(filter $(FC),ifort ifx))
 	OMPFLAGS = -qopenmp
 endif
 
-ifneq (,$(filter $(FC),flang flang-new))
-	FCFLAGS += -Wno-ignored-directive  -ffast-math -mepi 
+ifneq (,$(filter flang flang-new,$(notdir $(FC))))
+	FCFLAGS += -Wno-ignored-directive
+endif
+
+# EPI's LLVM (BSC) vectorises for RVV with -mepi, after which the library needs EPI's
+# vector math library from next to the compiler. Upstream flang rejects -mepi, so try a
+# compile with it (not for every compiler: ifx only warns about unknown options).
+# juffte.mk passes the link flags on to the programs, from their own directories, hence
+# the absolute path.
+EPI_LIBS =
+ifneq (,$(filter flang flang-new,$(notdir $(FC))))
+ifeq ($(shell $(FC) -mepi -c -x f95 /dev/null -o /dev/null > /dev/null 2>&1 && echo yes),yes)
+ifndef EPI_LIBDIR
+	EPI_LIBDIR := $(dir $(realpath $(shell command -v $(FC))))../lib
+endif
+ifeq (,$(wildcard $(EPI_LIBDIR)/libprovector-vecclonevp.*))
+$(error EPI's flang needs libprovector-vecclonevp, which is not in $(EPI_LIBDIR): set EPI_LIBDIR to its directory)
+endif
+	FCFLAGS += -ffast-math -mepi
+	EPI_LIBS = -L $(abspath $(EPI_LIBDIR)) -lprovector-vecclonevp
+endif
 endif
 
 ifneq (,$(filter $(FC),nvfortran))
@@ -63,10 +82,16 @@ OBJ    = utils_m.o param.o factor_m.o kernel_m.o fft235_m.o  zfft1d_m.o zfft2d_m
 OBJSP  = utils_m.o param.o factor_m.o kernel_m.o fft235s_m.o zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o juffte.o juffte_fftw.o
 OBJSPC = $(patsubst %.c, %.o, $(notdir $(wildcard $(SPRLPATH)/*.c)))
 
-all: $(LIBS)
+all: $(LIBS) juffte.mk
 
 install: all
-	mkdir -p $(PREFIX)/lib && mkdir -p $(PREFIX)/include  && cp *.a $(PREFIX)/lib && cp *.mod $(PREFIX)/include && cp *.h $(PREFIX)/include
+	mkdir -p $(PREFIX)/lib && mkdir -p $(PREFIX)/include  && cp *.a juffte.mk $(PREFIX)/lib && cp *.mod $(PREFIX)/include && cp *.h $(PREFIX)/include
+
+# Link flags beyond -ljuffte that a program needs, for the Makefiles that link the
+# library (include $(LIBDIR)/juffte.mk, then add $(JUFFTE_LIBS)). Written with the
+# library, so that a later make or make install without the same FC keeps it.
+juffte.mk: $(LIBS)
+	echo 'JUFFTE_LIBS = $(EPI_LIBS)' > $@
 # One library for every backend; the Spiral build only swaps the object list.
 LIBOBJ = $(OBJ)
 ifeq ($(WITHSPRL), 1)
@@ -111,7 +136,7 @@ juffte_fftw.o : juffte_fftw.c juffte.h
 	$(CC) $(CFLAGS) -c $< 
 
 clean:
-	rm -f *.o *.mod *.a 
+	rm -f *.o *.mod *.a juffte.mk
 
 docs:
 	@cd .. && $(MAKE) -C docs docs

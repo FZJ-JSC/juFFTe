@@ -30,8 +30,8 @@ ifneq (,$(filter $(CC),icx icx-cc))
 endif
 
 ifneq (,$(filter $(CC),clang clang-22))
-	CFLAGS = -g -O3 -ffast-math -mepi 
-	LIBFLAGS = -L $(LIBDIR)  -I $(INCDIR) -ljuffte  -L/apps/riscv/llvm/EPI/development/lib -lprovector-vecclonevp  -lm -lflang_rt.runtime
+	CFLAGS = -g -O3
+	LIBFLAGS = -L $(LIBDIR)  -I $(INCDIR) -ljuffte -lm -lflang_rt.runtime
 	OMPFLAGS = -fopenmp
 endif
 
@@ -42,6 +42,10 @@ ifneq (,$(filter $(CC),nvc nvcc))
 	OMPFLAGS = -fopenmp
 endif
 
+# Link flags the library needs beyond -ljuffte, such as EPI's vector math library;
+# written by src/Makefile next to the library.
+-include $(LIBDIR)/juffte.mk
+LIBFLAGS += $(JUFFTE_LIBS)
 # -mprefer-vector-width=512
 CFLAGS  += $(OMPFLAGS) 
 all: juffte_test_c
