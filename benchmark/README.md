@@ -38,6 +38,11 @@ make WITHSPRL=1
 | `-dim N` | Number of dimensions (1, 2, or 3) | 1 |
 | `-size s1 [s2 [s3]]` | Size per dimension | 256 |
 | `-type TYPE` | FFT type: `c2c`, `r2c`, `c2r` | c2c |
+| `-dir DIR` | Direction of `c2c`: `fw`, `bw` (`r2c` is forward, `c2r` backward) | fw |
+| `-place PLACE` | `c2c` in or out of place: `in`, `out` (the real transforms are out of place) | in |
+| `-mintime S` | Repeat each measurement for at least S seconds | 1 |
+| `-fftw-plan FLAG` | FFTW planner: `estimate`, `measure`, `patient` | measure |
+| `-wisdom FILE` | Read FFTW wisdom from FILE and write it back after planning | |
 | `-h, --help` | Print help message | |
 
 ### Examples
@@ -51,6 +56,9 @@ make WITHSPRL=1
 
 # 3D real-to-complex FFT, 128x128x128
 ./fftbench -dim 3 -size 128 128 128 -type r2c
+
+# 2D complex backward FFT, out of place
+./fftbench -dim 2 -size 1024 1024 -dir bw -place out
 ```
 
 ### Size Auto-fill
@@ -69,7 +77,15 @@ The benchmark outputs:
 - **TIME**: Average execution time per FFT operation (seconds)
 - **MFLOPS**: Estimated megaflops
 
-When built with FFTW (`WITH_REFERENCE_FFTW=1`), it also outputs FFTW timing for comparison.
+When built with FFTW (`WITH_REFERENCE_FFTW=1`), it also times FFTW on the same transform:
+the same type, direction and placement, on the same arrays and with the same number of
+threads, planned with `FFTW_MEASURE` unless `-fftw-plan` says otherwise. Planning is not
+timed.
+
+The timing loops repeat a transform on the same arrays, so in place the data grow
+(forward) or shrink (backward, which juFFTe normalises) from one call to the next until
+they overflow or underflow to zero. Flushing subnormal numbers to zero did not change the
+timings measurably on x86 (Zen 5).
 
 ## Utilities
 
@@ -77,8 +93,6 @@ When built with FFTW (`WITH_REFERENCE_FFTW=1`), it also outputs FFTW timing for 
 | ---- | ----------- |
 | `bench_utils_m.F90` | Benchmark utilities (argument parsing, array init) |
 | `fftw_m.F90` | FFTW interface for comparison (when `WITH_REFERENCE_FFTW=1`) |
-| `utils_m.F90` | General utilities |
-| `sc.sh` | Shell script for running scalability tests |
 
 ## Cleaning
 
