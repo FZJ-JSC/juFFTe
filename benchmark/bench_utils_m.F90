@@ -10,6 +10,13 @@ use, intrinsic :: iso_fortran_env
     integer :: dim = 1
     integer, allocatable :: size(:)
     character(len=32) :: fft_type = "c2c"
+    ! c2c only: r2c is a forward transform, c2r a backward one, both out of place.
+    character(len=32) :: direction = "fw"
+    character(len=32) :: placement = "in"
+    ! Each measurement repeats the transform for at least this many seconds.
+    real(real64) :: min_time = 1.0d0
+    character(len=32) :: fftw_planner = "measure"
+    character(len=256) :: wisdom_file = ""
 
     interface init
         module procedure init_r
@@ -60,6 +67,35 @@ contains
                 fft_type = trim(arg)
                 i = i + 2
 
+            case ("-dir")
+                call require_value(i, nargs, "-dir")
+                call get_command_argument(i+1, arg)
+                direction = trim(arg)
+                i = i + 2
+
+            case ("-place")
+                call require_value(i, nargs, "-place")
+                call get_command_argument(i+1, arg)
+                placement = trim(arg)
+                i = i + 2
+
+            case ("-mintime")
+                call require_value(i, nargs, "-mintime")
+                call get_command_argument(i+1, arg)
+                read(arg, *) min_time
+                i = i + 2
+
+            case ("-fftw-plan")
+                call require_value(i, nargs, "-fftw-plan")
+                call get_command_argument(i+1, arg)
+                fftw_planner = trim(arg)
+                i = i + 2
+
+            case ("-wisdom")
+                call require_value(i, nargs, "-wisdom")
+                call get_command_argument(i+1, wisdom_file)
+                i = i + 2
+
             case ("-size")
                 j = i + 1
                 do while (j <= nargs)
@@ -80,7 +116,23 @@ contains
         call finalize_sizes(tmp_size, nsize)
         deallocate(tmp_size)
 
+        call check_choice("-type", fft_type, "c2c r2c c2r")
+        call check_choice("-dir", direction, "fw bw")
+        call check_choice("-place", placement, "in out")
+        call check_choice("-fftw-plan", fftw_planner, "estimate measure patient")
+
     end subroutine parse_args
+
+
+    subroutine check_choice(opt, val, choices)
+        implicit none
+        character(len=*), intent(in) :: opt, val, choices
+
+        if (index(" " // choices // " ", " " // trim(val) // " ") == 0) then
+            print *, "Error: ", opt, " must be one of: ", choices
+            stop 1
+        end if
+    end subroutine check_choice
 
 
     subroutine finalize_sizes(tmp_size, nsize)
@@ -146,7 +198,14 @@ contains
         print *, "  -dim N           Number of dimensions (default: 1)"
         print *, "  -size s1 [s2..]  Size per dimension (default: 256)"
         print *, "                   auto-filled"
-        print *, "  -type TYPE       FFT type: c2c, r2c (default: c2c)"
+        print *, "  -type TYPE       FFT type: c2c, r2c, c2r (default: c2c)"
+        print *, "  -dir DIR         c2c direction: fw, bw (default: fw)"
+        print *, "  -place PLACE     c2c in or out of place: in, out (default: in)"
+        print *, "  -mintime S       Repeat each measurement for at least S seconds"
+        print *, "                   (default: 1)"
+        print *, "  -fftw-plan FLAG  FFTW planner: estimate, measure, patient"
+        print *, "                   (default: measure)"
+        print *, "  -wisdom FILE     Read and update FFTW wisdom in FILE"
         print *, "  -h, --help       Print this help"
         print *, ""
         print *, "Size rules:"
