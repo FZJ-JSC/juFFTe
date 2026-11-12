@@ -53,6 +53,16 @@ test Makefiles read. The thorough set adds about a thousand more cases: every 2-
 to 128, powers of each radix, lengths past the former size caps and lopsided shapes. The
 cases with `-o` and `-p`, and `plan_test`'s, carry the CTest label `plans`.
 
+`juffte_mpi_test_f` checks the distributed transforms, `pzfft2d` and `pzfft3d`, on the ranks
+it runs on: FP64 and FP32, in place and out of place, against the serial transform of the
+whole array; `-c` runs a plan on another communicator, which must stop. It is built with
+`-DWITH_MPI=ON`; each size of `MPI_2D` and `MPI_3D` runs on 1 to 4 ranks (`MPI_RANKS`), label
+`mpi`:
+
+```
+mpiexec -n np juffte_mpi_test_f [-d fw|bw] [-c] nx ny [nz]
+```
+
 ## Building and running
 
 With CMake, from the repository root, `ctest` runs every case:
@@ -71,4 +81,5 @@ make test
 make test THOROUGH=1
 make test WITH_REFERENCE_FFTW=1 FFTWINC=/usr/include
 ./juffte_test_f -t real -d bw 96 64
+make mpitest FC=mpif90    # library built with make WITHMPI=1 FC=mpif90
 ```

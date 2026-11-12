@@ -91,3 +91,28 @@ call zfft2d(a, nx, ny, juffte_destroy, plan=plan)
 ```
 
 Lengths must be products of 2, 3 and 5, and a transform may have up to 2^31 - 1 elements.
+
+## Distributed transforms (MPI)
+
+With juFFTe built with MPI (`-DWITH_MPI=ON`), `pzfft2d` and `pzfft3d` compute complex
+transforms distributed over the ranks of a communicator, in slabs: with `np` ranks, each
+holds `nz/np` planes of a 3-D array, `a(nx, ny, nz/np)`, or `ny/np` rows of a 2-D one,
+`a(nx, ny/np)`, in the input and in the output. `np` must divide `nx` and the last size. The
+plan is always the caller's own, made on the communicator by all of its ranks. Every call is
+collective, and only one transform at a time may run on a communicator, never from several
+threads at once:
+
+```fortran
+use mpi_f08
+use juffte
+type(juffte_plan) :: plan
+complex(real64), allocatable :: a(:), b(:)
+integer :: np
+
+call MPI_Comm_size(MPI_COMM_WORLD, np)
+allocate(a(nx*ny*(nz/np)), b(nx*ny*(nz/np)))    ! this rank's planes, a(nx, ny, nz/np)
+call pzfft3d(a, nx, ny, nz, MPI_COMM_WORLD, juffte_init, plan)
+call pzfft3d(a, nx, ny, nz, MPI_COMM_WORLD, juffte_fw, plan)          ! in place
+call pzfft3d(a, nx, ny, nz, MPI_COMM_WORLD, juffte_bw, plan, out=b)   ! out of place
+call pzfft3d(a, nx, ny, nz, MPI_COMM_WORLD, juffte_destroy, plan)
+```
