@@ -10,20 +10,19 @@ implicit none
 
 private
 #ifdef SPRL
-public  :: factor, factor2, getnxny, check_size
+public  :: factor, factor2, getnxny, check_size, radices
 #else
-public  :: factor, getnxny, check_size
+public  :: factor, getnxny, check_size, radices
 #endif
 
 contains
 
-! Stops with a message unless n is a product of 2, 3 and 5 and at most cap. Any other
-! length gives wrong results or overruns the fixed-size tables.
-subroutine check_size(routine, n, cap)
+! Stops with a message unless n is a product of 2, 3 and 5; any other length gives wrong
+! results.
+subroutine check_size(routine, n)
     implicit none
     character(len=*), intent(in) :: routine
     integer, intent(in) :: n
-    integer, intent(in), optional :: cap
     integer, parameter :: primes(3) = [2, 3, 5]
     integer :: m, i
 
@@ -37,13 +36,19 @@ subroutine check_size(routine, n, cap)
         write(error_unit, '(a,": length ",i0," is not a product of 2, 3 and 5")') routine, n
         error stop 1
     end if
-    if (present(cap)) then
-        if (n > cap) then
-            write(error_unit, '(a,": length ",i0," exceeds the maximum ",i0)') routine, n, cap
-            error stop 1
-        end if
-    end if
 end subroutine check_size
+
+! The radices fft235 takes for length n: factor's, or with the Spiral kernels factor2's.
+subroutine radices(n, ip)
+    implicit none
+    integer, intent(in) :: n
+    integer, intent(inout) :: ip(*)
+#ifdef SPRL
+    call factor2(n, ip)
+#else
+    call factor(n, ip)
+#endif
+end subroutine radices
 
 subroutine factor(n, ip)
     implicit none

@@ -7,7 +7,7 @@ module zdfft3d_m
 
 use, intrinsic :: iso_fortran_env
 use param
-use factor_m
+use plan_m
 #ifdef SPRL
 use fft235s_m
 #else
@@ -16,8 +16,7 @@ use fft235_m
 
 implicit none
 
-complex(real64),  allocatable :: b (:)
-complex(real32),  allocatable :: b_r32 (:)
+type(plan_t), pointer :: plans => null()
 private
 public :: zdfft3d, zdfft3d_64, zdfft3d_32
 
@@ -28,46 +27,32 @@ end interface
 
 contains
 
-subroutine zdfft3d_64(a, a_r, nx, ny, nz, iopt)
+subroutine zdfft3d_64(a, a_r, nx, ny, nz, iopt, plan)
     use param
     implicit none
     complex(real64), intent(inout) :: a(*)
     real(real64), intent(out) :: a_r(*)
     integer, intent(in) :: nx, ny, nz, iopt
-    complex(real64) :: c((NDA3 + NP)*NBLK), d(NDA3)
-    complex(real64), save :: wx(NDA3), wy(NDA3), wz(NDA3)
-#ifdef SPRL
-    integer, save :: lnx(16), lny(16), lnz(16)
-#else
-    integer :: lnx(3), lny(3), lnz(3)
-#endif
+    type(juffte_plan), intent(inout), optional :: plan
+    complex(real64), pointer, contiguous :: w(:), c(:), d(:)
+    integer(int64) :: nc
+    integer :: slot
+    complex(real64), pointer, contiguous :: b(:)
+    type(plan_t), pointer :: p
 
-
-    if (iopt == juffte_init) then
-        call check_size('zdfft3d', nx, NDA3)
-        call check_size('zdfft3d', ny, NDA3)
-        call check_size('zdfft3d', nz, NDA3)
-        allocate (b(nx*ny*nz*2))
-#ifdef SPRL
-        call factor2(nx,lnx)
-        call factor2(ny,lny)
-        call factor2(nz,lnz)
-#endif
-        call settbl(wx, nx)
-        call settbl(wy, ny)
-        call settbl(wz, nz)
-        return
-    end if
-#ifndef SPRL
-    call factor(nx, lnx)
-    call factor(ny, lny)
-    call factor(nz, lnz)
-#endif
-
-!$OMP PARALLEL PRIVATE(C,D)
-    call zdfft3d0_64(a, a_r, b, c, c, c, d, wx, wy, wz, nx, ny, nz, lnx, lny, lnz)
+    nc = max(int(nx, int64), (int(max(ny, nz), int64) + NP)*NBLK)
+    call plan_begin(plans, 'zdfft3d', [nx, ny, nz], iopt, p, b, (nx/2 + 1)*ny*nz, nthread=nc + max(nx, ny, nz), plan=plan)
+    if (iopt == juffte_init .or. iopt == juffte_destroy) return
+    ! The thread's work arrays, in its slot of the plan.
+!$OMP PARALLEL PRIVATE(W,SLOT,C,D)
+    call plan_thread(p, w, slot)
+    c => w(1:nc)
+    d => w(nc + 1:)
+    call zdfft3d0_64(a, a_r, b, c, c, c, d, p%wx, p%wy, p%wz, nx, ny, nz, &
+                     p%lp(:, 1), p%lp(:, 2), p%lp(:, 3))
+    call plan_thread_end(p, w, slot)
 !$OMP END PARALLEL
-    return
+    call plan_end(p, b)
 end subroutine zdfft3d_64
 
 subroutine zdfft3d0_64(a, da, b, cx, cy, cz, d, wx, wy, wz, nx, ny, nz, lnx, lny, lnz)
@@ -189,46 +174,32 @@ subroutine zdfft3d0_64(a, da, b, cx, cy, cz, d, wx, wy, wz, nx, ny, nz, lnx, lny
     return
 end subroutine zdfft3d0_64
 
-subroutine zdfft3d_32(a, a_r, nx, ny, nz, iopt)
+subroutine zdfft3d_32(a, a_r, nx, ny, nz, iopt, plan)
     use param
     implicit none
     complex(real32), intent(inout) :: a(*)
     real(real32), intent(out) :: a_r(*)
     integer, intent(in) :: nx, ny, nz, iopt
-    complex(real32) :: c((NDA3 + NP)*NBLK), d(NDA3)
-    complex(real32), save :: wx(NDA3), wy(NDA3), wz(NDA3)
-#ifdef SPRL
-    integer, save :: lnx(16), lny(16), lnz(16)
-#else
-    integer :: lnx(3), lny(3), lnz(3)
-#endif
+    type(juffte_plan), intent(inout), optional :: plan
+    complex(real32), pointer, contiguous :: w(:), c(:), d(:)
+    integer(int64) :: nc
+    integer :: slot
+    complex(real32), pointer, contiguous :: b(:)
+    type(plan_t), pointer :: p
 
-
-    if (iopt == juffte_init) then
-        call check_size('zdfft3d', nx, NDA3)
-        call check_size('zdfft3d', ny, NDA3)
-        call check_size('zdfft3d', nz, NDA3)
-        allocate (b_r32(nx*ny*nz*2))
-#ifdef SPRL
-        call factor2(nx,lnx)
-        call factor2(ny,lny)
-        call factor2(nz,lnz)
-#endif
-        call settbl_r32(wx, nx)
-        call settbl_r32(wy, ny)
-        call settbl_r32(wz, nz)
-        return
-    end if
-#ifndef SPRL
-    call factor(nx, lnx)
-    call factor(ny, lny)
-    call factor(nz, lnz)
-#endif
-
-!$OMP PARALLEL PRIVATE(C,D)
-    call zdfft3d0_32(a, a_r, b_r32, c, c, c, d, wx, wy, wz, nx, ny, nz, lnx, lny, lnz)
+    nc = max(int(nx, int64), (int(max(ny, nz), int64) + NP)*NBLK)
+    call plan_begin(plans, 'zdfft3d', [nx, ny, nz], iopt, p, b, (nx/2 + 1)*ny*nz, nthread=nc + max(nx, ny, nz), plan=plan)
+    if (iopt == juffte_init .or. iopt == juffte_destroy) return
+    ! The thread's work arrays, in its slot of the plan.
+!$OMP PARALLEL PRIVATE(W,SLOT,C,D)
+    call plan_thread(p, w, slot)
+    c => w(1:nc)
+    d => w(nc + 1:)
+    call zdfft3d0_32(a, a_r, b, c, c, c, d, p%wx_r32, p%wy_r32, p%wz_r32, nx, ny, nz, &
+                     p%lp(:, 1), p%lp(:, 2), p%lp(:, 3))
+    call plan_thread_end(p, w, slot)
 !$OMP END PARALLEL
-    return
+    call plan_end(p, b)
 end subroutine zdfft3d_32
 
 subroutine zdfft3d0_32(a, da, b, cx, cy, cz, d, wx, wy, wz, nx, ny, nz, lnx, lny, lnz)
