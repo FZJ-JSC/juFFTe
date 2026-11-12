@@ -60,6 +60,9 @@ type :: plan_t
     complex(real32), allocatable :: wx_r32(:), wy_r32(:), wz_r32(:), w_r32(:), b_r32(:)
     integer :: nthread = 0           ! elements of a thread's work array
     type(slot_t), allocatable :: slots(:)
+    ! A distributed plan's MPI communicator, as its Fortran handle (MPI_Comm%MPI_VAL), and
+    ! the number of ranks and this one's; the build sets np and me.
+    integer :: comm = 0, np = 1, me = 0
     type(plan_t), pointer :: next => null()
 end type plan_t
 
@@ -77,7 +80,8 @@ abstract interface
     end subroutine build_i
 end interface
 
-! call plan_begin(head, routine, n, iopt, p, b [, nwork] [, build] [, nthread] [, plan])
+! call plan_begin(head, routine, n, iopt, p, b [, nwork] [, build] [, nthread] [, plan]
+!                 [, comm])
 !
 ! The start of every call of a transform, of shape n, in the list head, or with the plan
 ! of the caller's own if plan is present; routine names the transform. juffte_init checks
@@ -87,7 +91,8 @@ end interface
 ! unassociated, and the transform returns. Any other iopt: p is the plan and b the call's
 ! work array, the plan's or one of the same size while another call has that, until
 ! plan_end(p, b). The kind of b selects the precision; b stays unassociated if the plan has
-! no work array.
+! no work array. comm, the Fortran handle of an MPI communicator, makes a distributed plan,
+! which only a call on the same communicator may run.
 interface plan_begin
     module procedure plan_begin_64, plan_begin_32
 end interface
@@ -110,7 +115,7 @@ end interface
 
 contains
 
-subroutine plan_begin_64(head, routine, n, iopt, p, b, nwork, build, nthread, plan)
+subroutine plan_begin_64(head, routine, n, iopt, p, b, nwork, build, nthread, plan, comm)
     type(plan_t), pointer, intent(inout) :: head
     character(len=*), intent(in) :: routine
     integer, intent(in) :: n(:), iopt
@@ -120,12 +125,13 @@ subroutine plan_begin_64(head, routine, n, iopt, p, b, nwork, build, nthread, pl
     integer(int64), intent(in), optional :: nthread
     procedure(build_i), optional :: build
     type(juffte_plan), intent(inout), optional :: plan
+    integer, intent(in), optional :: comm
     logical :: own
 
     call check_iopt(routine, iopt)
     b => null()
     if (present(plan) .or. iopt == juffte_init .or. iopt == juffte_destroy) then
-        call begin(head, routine, n, 64, iopt, p, own, nwork, build, nthread, plan)
+        call begin(head, routine, n, 64, iopt, p, own, nwork, build, nthread, plan, comm)
     else
         call plan_acquire(head, routine, n, 64, p, own)
     end if
@@ -137,7 +143,7 @@ subroutine plan_begin_64(head, routine, n, iopt, p, b, nwork, build, nthread, pl
     end if
 end subroutine plan_begin_64
 
-subroutine plan_begin_32(head, routine, n, iopt, p, b, nwork, build, nthread, plan)
+subroutine plan_begin_32(head, routine, n, iopt, p, b, nwork, build, nthread, plan, comm)
     type(plan_t), pointer, intent(inout) :: head
     character(len=*), intent(in) :: routine
     integer, intent(in) :: n(:), iopt
@@ -147,12 +153,13 @@ subroutine plan_begin_32(head, routine, n, iopt, p, b, nwork, build, nthread, pl
     integer(int64), intent(in), optional :: nthread
     procedure(build_i), optional :: build
     type(juffte_plan), intent(inout), optional :: plan
+    integer, intent(in), optional :: comm
     logical :: own
 
     call check_iopt(routine, iopt)
     b => null()
     if (present(plan) .or. iopt == juffte_init .or. iopt == juffte_destroy) then
-        call begin(head, routine, n, 32, iopt, p, own, nwork, build, nthread, plan)
+        call begin(head, routine, n, 32, iopt, p, own, nwork, build, nthread, plan, comm)
     else
         call plan_acquire(head, routine, n, 32, p, own)
     end if
@@ -190,7 +197,7 @@ end subroutine plan_end_32
 
 ! plan_begin for juffte_init, juffte_destroy and plans of the caller's own, without the
 ! work array. own: the call has the plan's work array to itself.
-subroutine begin(head, routine, n, prec, iopt, p, own, nwork, build, nthread, plan)
+subroutine begin(head, routine, n, prec, iopt, p, own, nwork, build, nthread, plan, comm)
     type(plan_t), pointer, intent(inout) :: head
     character(len=*), intent(in) :: routine
     integer, intent(in) :: n(:), prec, iopt
@@ -200,10 +207,11 @@ subroutine begin(head, routine, n, prec, iopt, p, own, nwork, build, nthread, pl
     integer(int64), intent(in), optional :: nthread
     procedure(build_i), optional :: build
     type(juffte_plan), intent(inout), optional :: plan
+    integer, intent(in), optional :: comm
 
     p => null()
     own = .false.
-    if (iopt == juffte_init) call check_shape(routine, n)
+    if (iopt == juffte_init) call check_shape(routine, n, present(comm))
     if (.not. present(plan)) then
         if (iopt == juffte_init) then
             call plan_init(head, routine, n, prec, nwork, build, nthread)
@@ -217,27 +225,30 @@ subroutine begin(head, routine, n, prec, iopt, p, own, nwork, build, nthread, pl
     case (juffte_init)
         ! Never reads what plan held: a private copy in an OpenMP region need not be
         ! default-initialised (gfortran's are not). A plan it held is the caller's to destroy.
-        plan%p => make(routine, n, prec, nwork, build, nthread)
+        plan%p => make(routine, n, prec, nwork, build, nthread, comm)
     case (juffte_destroy)
-        call check_own(routine, n, prec, plan%p)
+        call check_own(routine, n, prec, plan%p, comm)
         deallocate(plan%p)
     case default
-        call check_own(routine, n, prec, plan%p)
+        call check_own(routine, n, prec, plan%p, comm)
         p => plan%p
         own = claim(p)
     end select
 end subroutine begin
 
-! Stops unless every length of shape n is a product of 2, 3 and 5, and the transform has
-! no more elements than a default integer counts.
-subroutine check_shape(routine, n)
+! Stops unless every length of shape n is a product of 2, 3 and 5, and, unless it is
+! distributed, the transform has no more elements than a default integer counts.
+subroutine check_shape(routine, n, distributed)
     character(len=*), intent(in) :: routine
     integer, intent(in) :: n(:)
+    logical, intent(in) :: distributed
     integer :: d
 
     do d = 1, size(n)
         call check_size(routine, n(d))
     end do
+    ! A distributed transform's driver checks the share of a rank instead.
+    if (distributed) return
     if (product(int(n, int64)) > huge(0)) then
         write(error_unit, '(a,": ",a," has more than ",i0," elements")') &
             routine, trim(shape_text(n)), huge(0)
@@ -246,17 +257,19 @@ subroutine check_shape(routine, n)
 end subroutine check_shape
 
 ! A new plan, not yet in any list.
-function make(routine, n, prec, nwork, build, nthread) result(p)
+function make(routine, n, prec, nwork, build, nthread, comm) result(p)
     character(len=*), intent(in) :: routine
     integer, intent(in) :: n(:), prec
     integer, intent(in), optional :: nwork
     integer(int64), intent(in), optional :: nthread
     procedure(build_i), optional :: build
+    integer, intent(in), optional :: comm
     type(plan_t), pointer :: p
     integer :: slots
 
     allocate(p)
     p%routine = routine
+    if (present(comm)) p%comm = comm
     p%rank = size(n)
     p%n(1:size(n)) = n
     p%prec = prec
@@ -537,11 +550,12 @@ subroutine check_iopt(routine, iopt)
 end subroutine check_iopt
 
 ! Stops unless p, the plan of the caller's own, is one for this transform of shape n in
-! precision prec.
-subroutine check_own(routine, n, prec, p)
+! precision prec, and on communicator comm if given.
+subroutine check_own(routine, n, prec, p, comm)
     character(len=*), intent(in) :: routine
     integer, intent(in) :: n(:), prec
     type(plan_t), pointer, intent(in) :: p
+    integer, intent(in), optional :: comm
 
     if (.not. associated(p)) then
         write(error_unit, '(a,": plan= holds no plan; make it with juffte_init first")') routine
@@ -552,6 +566,12 @@ subroutine check_own(routine, n, prec, p)
                           &" plan for ",a," in FP",i0)') routine, trim(p%routine), &
             trim(shape_text(p%n(1:p%rank))), p%prec, routine, trim(shape_text(n)), prec
         error stop 1
+    end if
+    if (present(comm)) then
+        if (p%comm /= comm) then
+            write(error_unit, '(a,": plan= was made on another communicator")') routine
+            error stop 1
+        end if
     end if
 end subroutine check_own
 

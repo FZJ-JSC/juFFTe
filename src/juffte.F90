@@ -28,6 +28,8 @@ type :: fftw_plan_t
     type(juffte_plan) :: plan
 end type fftw_plan_t
 private :: fftw_plan_t, fftw_plan_new, fftw_call, fftw_run
+! param's tuning constants stay inside: np, nb and the like are users' names.
+private :: NP, NB, NBLK, L2SIZE, MAXNPU
 
 contains
 
