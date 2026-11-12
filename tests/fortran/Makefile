@@ -45,10 +45,13 @@ LIBFLAGS += $(JUFFTE_LIBS)
 FCFLAGS  += $(OMPFLAGS) 
 # -mprefer-vector-width=512
 
-all: juffte_test_f
+all: juffte_test_f plan_test
 
 juffte_test_f : juffte_test.F90
 	$(FC) $(FCFLAGS) $< $(LIBFLAGS) $(FFTWFLAGS) -o $@
+
+plan_test : plan_test.F90
+	$(FC) $(FCFLAGS) $< $(LIBFLAGS) -o $@
 
 # Size lists shared with CMakeLists.txt; THOROUGH=1 adds the long ones.
 include ../sizes.mk
@@ -61,16 +64,30 @@ endif
 T = ./juffte_test_f
 
 # Exit status 77: no reference at this size (N >= 4000 without FFTW), not a failure.
-test : juffte_test_f
+# fft_init/fft_execute (-a simple) only take 1-D shapes: those without a blank or an x.
+test : juffte_test_f plan_test
 	set -e; t() { $(T) "$$@" || [ $$? -eq 77 ]; }; for d in fw bw; do \
-	    for s in $(SIZES_1D); do t -t complex -d $$d $$s; t -t real -d $$d $$s; \
-	        t -t complex -d $$d -a fftw $$s; t -t complex -d $$d -a simple $$s; done; \
-	    for s in $(SIZES_2D) $(SIZES_3D); do t -t complex -d $$d $$s; t -t real -d $$d $$s; \
-	        t -t complex -d $$d -a fftw $$s; done; \
-	    for s in $(SIZES_SIXSTEP); do t -t complex -d $$d $$s; t -t complex -d $$d -a fftw $$s; \
-	        t -t complex -d $$d -a simple $$s; done; \
+	    for s in $(SIZES_1D) $(SIZES_2D) $(SIZES_3D) $(SIZES_SIXSTEP); do \
+	        for a in native plan; do t -t complex -d $$d -a $$a $$s; t -t real -d $$d -a $$a $$s; done; \
+	        t -t complex -d $$d -a fftw $$s; \
+	        case "$$s" in *' '*) ;; *) t -t complex -d $$d -a simple $$s;; esac; done; \
+	    for s in $(THREADS); do \
+	        for a in native plan; do t -t complex -d $$d -a $$a -p $$s; t -t real -d $$d -a $$a -p $$s; done; \
+	        t -t complex -d $$d -a fftw -p $$s; \
+	        case "$$s" in *' '*) ;; *) t -t complex -d $$d -a simple -p $$s;; esac; done; \
 	done; \
-	$(T) 14 2>&1 | grep 'length 14 is not a product of 2, 3 and 5'
+	for p in $(PLANS); do set -- $$p; s=$$(echo $$1 | tr x ' '); \
+	    for a in native plan; do t -a $$a -o $$2 $$s; t -t real -a $$a -o $$2 $$s; done; \
+	    t -a fftw -o $$2 $$s; \
+	    case $$1$$2 in *x*) ;; *) t -a simple -o $$2 $$s;; esac; done; \
+	MALLOC_PERTURB_=165 ./plan_test; \
+	$(T) 14 2>&1 | grep 'length 14 is not a product of 2, 3 and 5'; \
+	./plan_test unmade 2>&1 | grep 'zfft1d: plan= holds no plan'; \
+	./plan_test other-shape 2>&1 | grep 'zfft1d: plan= holds a zfft1d plan for length 16 in FP64, not a zfft1d plan for length 32'; \
+	./plan_test other-transform 2>&1 | grep 'dzfft2d: plan= holds a zfft2d plan for 4 x 4 in FP64, not a dzfft2d plan'; \
+	./plan_test too-large 2>&1 | grep 'zfft3d: 2048 x 2048 x 1024 has more than 2147483647 elements'; \
+	./plan_test work-too-large 2>&1 | grep 'zfft2d: 2 x 134217728 needs per-thread work arrays of more than'; \
+	./plan_test bad-iopt 2>&1 | grep 'zfft1d: iopt is -2; use juffte_init (0), juffte_fw (-1), juffte_bw (1) or juffte_destroy (2)'
 
 clean:
-	rm -f juffte_test_f *.o *.mod
+	rm -f juffte_test_f plan_test *.o *.mod

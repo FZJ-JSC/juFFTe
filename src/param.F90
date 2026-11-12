@@ -9,10 +9,6 @@ use, intrinsic :: iso_fortran_env
 implicit none
 
 integer, parameter :: MAXNPU = 65536
-! The maximum supported 2-D transform length is 65536.
-integer, parameter :: NDA2 = 65536
-! The maximum supported 3-D transform length is 4096.
-integer, parameter :: NDA3 = 4096
 ! The parameter NBLK is a blocking parameter.
 integer, parameter :: NBLK = 16
 ! The parameter NB is a blocking parameter for NVIDIA GPUs.
@@ -27,7 +23,9 @@ integer, parameter :: ALN = 64
 
 integer, parameter       :: juffte_fw = -1
 integer, parameter       :: juffte_bw = 1
-integer, parameter       :: juffte_init = 0 
+integer, parameter       :: juffte_init = 0
+! Undoes one juffte_init: the plan of that shape is freed with the last.
+integer, parameter       :: juffte_destroy = 2
 
 ! FFTW interface
 integer, parameter       :: FFTW_FORWARD    = -1

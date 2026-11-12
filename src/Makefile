@@ -78,8 +78,8 @@ FCFLAGS  += $(OMPFLAGS)
 PREFIX ?= /usr/
 
 
-OBJ    = utils_m.o param.o factor_m.o kernel_m.o fft235_m.o  zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o juffte.o juffte_fftw.o
-OBJSP  = utils_m.o param.o factor_m.o kernel_m.o fft235s_m.o zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o juffte.o juffte_fftw.o
+OBJ    = utils_m.o param.o factor_m.o plan_m.o kernel_m.o fft235_m.o  zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o juffte.o juffte_fftw.o
+OBJSP  = utils_m.o param.o factor_m.o plan_m.o kernel_m.o fft235s_m.o zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o juffte.o juffte_fftw.o
 OBJSPC = $(patsubst %.c, %.o, $(notdir $(wildcard $(SPRLPATH)/*.c)))
 
 all: $(LIBS) juffte.mk
@@ -92,10 +92,13 @@ install: all
 # library, so that a later make or make install without the same FC keeps it.
 juffte.mk: $(LIBS)
 	echo 'JUFFTE_LIBS = $(EPI_LIBS)' > $@
-# One library for every backend; the Spiral build only swaps the object list.
+# One library for every backend; the Spiral build only swaps the object list, and the
+# fft235 driver the transforms use.
 LIBOBJ = $(OBJ)
+FFT235 = fft235_m.o
 ifeq ($(WITHSPRL), 1)
 LIBOBJ = $(OBJSP) $(OBJSPC)
+FFT235 = fft235s_m.o
 endif
 
 libjuffte.a: $(LIBOBJ)
@@ -107,27 +110,30 @@ utils_m.o : utils_m.F90 param.o
 	$(FC) $(FCFLAGS) -I. -c $<
 factor_m.o : factor_m.F90 param.o
 	$(FC) $(FCFLAGS) -I. -c $<
+plan_m.o : plan_m.F90 $(FFT235) factor_m.o param.o
+	$(FC) $(FCFLAGS) -I. -c $<
 kernel_m.o : kernel_m.F90 param.o
 	$(FC) $(FCFLAGS) -I. -c $<
 fft235_m.o : fft235_m.F90 kernel_m.o factor_m.o
 	$(FC) $(FCFLAGS) -I. -c $<
 fft235s_m.o : fft235s_m.F90 kernel_m.o factor_m.o
 	$(FC) $(FCFLAGS) -I. -c $<
-zfft1d_m.o : zfft1d_m.F90 fft235_m.o factor_m.o param.o
+zfft1d_m.o : zfft1d_m.F90 $(FFT235) factor_m.o plan_m.o param.o
 	$(FC) $(FCFLAGS) -I. -c $<
-zfft2d_m.o : zfft2d_m.F90 zfft1d_m.o factor_m.o
+zfft2d_m.o : zfft2d_m.F90 $(FFT235) plan_m.o param.o
 	$(FC) $(FCFLAGS) -I. -c $<
-zfft3d_m.o : zfft3d_m.F90 zfft2d_m.o zfft1d_m.o
+zfft3d_m.o : zfft3d_m.F90 $(FFT235) plan_m.o param.o
 	$(FC) $(FCFLAGS) -I. -c $<
-dzfft2d_m.o : dzfft2d_m.F90 fft235_m.o zfft1d_m.o factor_m.o
+dzfft2d_m.o : dzfft2d_m.F90 $(FFT235) plan_m.o param.o
 	$(FC) $(FCFLAGS) -I. -c $<
-zdfft2d_m.o : zdfft2d_m.F90 fft235_m.o zfft1d_m.o factor_m.o
+zdfft2d_m.o : zdfft2d_m.F90 $(FFT235) plan_m.o param.o
 	$(FC) $(FCFLAGS) -I. -c $<
-dzfft3d_m.o : dzfft3d_m.F90 dzfft2d_m.o zfft1d_m.o
+dzfft3d_m.o : dzfft3d_m.F90 $(FFT235) plan_m.o param.o
 	$(FC) $(FCFLAGS) -I. -c $<
-zdfft3d_m.o : zdfft3d_m.F90 zdfft2d_m.o zfft1d_m.o
+zdfft3d_m.o : zdfft3d_m.F90 $(FFT235) plan_m.o param.o
 	$(FC) $(FCFLAGS) -I. -c $<
-juffte.o : juffte.F90 zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o utils_m.o
+juffte.o : juffte.F90 zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o \
+           plan_m.o factor_m.o utils_m.o param.o
 	$(FC) $(FCFLAGS) -I. -c $<
 juffte_fftw.o : juffte_fftw.c juffte.h
 	$(CC) $(CFLAGS) -c $<

@@ -111,7 +111,24 @@ Edit the Makefile if necessary for your system setup.
 | `dzfft3d(a, a_c, nx, ny, nz, juffte_x)`     | 3-D real-to-complex FFT         |
 | `zdfft3d(a_c, a, nx, ny, nz, juffte_x)`     | 3-D complex-to-real FFT         |
 
-- `juffte_x` can be `juffte_init` for initialization, `juffte_fw` for forward FFT, or `juffte_bw` for backward.
+- `juffte_x` can be `juffte_init` for initialization, `juffte_fw` for forward FFT, `juffte_bw` for
+  backward, or `juffte_destroy` to undo one `juffte_init`.
+- Each transform keeps a plan per shape and precision. `juffte_init` makes it, or takes another
+  reference to it if it exists; `juffte_destroy` drops one, and the plan is freed with the
+  last. Plans of different shapes can be live at once, and in a build with OpenMP (the
+  default) transforms may be called from several threads at once. A transform of a shape
+  without a plan stops with a message.
+- From Fortran, every transform also takes a plan of your own as a last argument,
+  `type(juffte_plan) :: plan`, e.g. `call zfft1d(a, n, juffte_init, plan=plan)`, then
+  `juffte_fw`/`juffte_bw` with the same `plan=`, and `juffte_destroy` to free it. Such a plan
+  is not shared: its calls skip the lookup and its lock, and no `juffte_destroy` elsewhere in
+  the program can free it. Like an FFTW plan, it may run from several threads at once, but
+  not while it is made or destroyed, and making a new one in the same variable does not free
+  the old one. With many threads running small transforms, give each thread its own: the
+  shared plans' lock then serialises them (16 points on 8 threads: 4.5 µs per call with the
+  shared plans, 80 ns with a plan per thread).
+- Lengths must be products of 2, 3 and 5, and a transform may have up to 2^31 - 1 elements;
+  there is no other size limit.
 - `_out` denotes the out-of-place transformation (output goes last).
 - Dimensions are given contiguous first: in `zfft2d(a, nx, ny, ...)`, `nx` is the contiguous
   one (Fortran's array order), from C as well.
@@ -124,6 +141,7 @@ Edit the Makefile if necessary for your system setup.
 | -------------------------------- | ----------------------------------- |
 | `fft_init(a)`                    | Initialize 1-D complex FFT plan     |
 | `fft_execute(a, juffte_x)`       | Execute 1-D complex FFT             |
+| `fft_destroy(a)`                 | Release the plan of `fft_init`      |
 
 ### FFTW API (drop-in compatibility)
 
@@ -153,8 +171,10 @@ The C entry points are exported as `juffte_fftw_*` and `juffte.h` maps the `fftw
 them, so juFFTe exports nothing that clashes with real FFTW. A program can therefore link both
 libraries at once — which is how the benchmark compares them.
 
-Known limitation: only one plan can be live at a time. Creating a second plan currently
-fails. See the open issues.
+Each `fftw_plan_dft_*` makes a plan of its own, which `fftw_destroy_plan` frees, so any
+number of plans can be live at once and run from several threads at once, as in FFTW. As in
+FFTW, any sign other than `FFTW_FORWARD` is backward, and the planner flags make no
+difference.
 
 See `examples/c/fftw-test*.c` and `examples/fortran/test*-fftwint.F90` for FFTW code running on
 juFFTe.
