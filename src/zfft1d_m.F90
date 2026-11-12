@@ -8,6 +8,7 @@ module zfft1d_m
 use, intrinsic :: iso_fortran_env
 use param
 use factor_m
+use plan_m
 #ifdef SPRL
 use fft235s_m
 #else
@@ -15,8 +16,7 @@ use fft235_m
 #endif
 
 implicit none
-complex(real64),  allocatable :: b (:)
-complex(real32),  allocatable :: b_r32 (:)
+type(plan_t), pointer :: plans => null()
 private
 public :: zfft1d, zfft1d_64, zfft1d_32
 
@@ -26,27 +26,22 @@ end interface
 
 contains
 
-subroutine zfft1d_64(a, n, iopt, out)
+subroutine zfft1d_64(a, n, iopt, out, plan)
     use param
     implicit none
 
     complex(real64), intent(inout)        :: a(*)
     complex(real64), optional,intent(out) :: out(*)
+    type(juffte_plan), intent(inout), optional :: plan
     integer, intent(in)              :: n, iopt
-    complex(real64), allocatable          :: c(:), d(:)
-#ifdef SPRL
-    integer,save                     :: ip(16), lnx(16), lny(16)
-#else
-    integer                          :: ip(3), lnx(3), lny(3)
-#endif
-    complex(real64), save                 :: wx(NDA2), wy(NDA2)
+    complex(real64), pointer, contiguous  :: w(:), c(:), d(:)
+    complex(real64), pointer, contiguous  :: b(:)
+    type(plan_t), pointer            :: p
     real(real64)                          :: dn
-    integer                          :: i, nx, ny
+    integer                          :: i, nx, ny, nc, slot
 
-    if (iopt == juffte_init) then
-        call check_size('zfft1d', n)
-        allocate(b(n*2))
-    end if
+    call plan_begin(plans, 'zfft1d', [n], iopt, p, b, n, build_64, plan=plan)
+    if (iopt == juffte_init .or. iopt == juffte_destroy) return
 
     if (iopt == juffte_bw) then
         if (present(out)) then
@@ -64,57 +59,39 @@ subroutine zfft1d_64(a, n, iopt, out)
         end if
     end if
 
-    if (n <= l2size/16/3) then
-        if (iopt == juffte_init) then
-#ifdef SPRL
-            call factor2(n, ip)
-#endif
-            call settbl(b(n + 1), n)
-            return
-        end if
-#ifndef SPRL
-            call factor(n, ip)
-#endif
+    if (.not. allocated(p%wx)) then  ! fft235 alone, see build_64
         if (present(out)) then
 
             if (iopt == juffte_bw) then
-                call fft235( out, b, b(n + 1), n, ip)
+                call fft235( out, b, p%w, n, p%lp(:, 1))
             else
-                call fft235_o( a, b, b(n + 1), n, ip, out)
+                call fft235_o( a, b, p%w, n, p%lp(:, 1), out)
             end if
         else
-            call fft235(a, b, b(n + 1), n, ip)
+            call fft235(a, b, p%w, n, p%lp(:, 1))
         end if
     else
-                    call getnxny(n, nx, ny)
+                    nx = size(p%wx)
+                    ny = size(p%wy)
 
-                    if (iopt == juffte_init) then
-#ifdef SPRL
-                    call factor2(nx,lnx)
-                    call factor2(ny,lny)
-#endif
-                        call settbl(wx, nx)
-                        call settbl(wy, ny)
-                        call settbl2(b(n + 1), nx, ny)
-                        return
-                    end if
-#ifndef SPRL
-                    call factor(nx, lnx)
-                    call factor(ny, lny)
-#endif
-
-                    ! Per-thread work arrays on the heap: as fixed-size locals they took
-                    ! ~17 MB of stack. Out of place backward, out already holds conj(a).
-!$OMP PARALLEL PRIVATE(C,D)
-                    allocate(c((max(nx, ny) + NP)*NBLK), d(max(nx, ny)))
+                    ! The thread's work arrays, in its slot of the plan. Out of place backward, out
+                    ! already holds conj(a).
+                    nc = (max(nx, ny) + NP)*NBLK
+!$OMP PARALLEL PRIVATE(W,SLOT,C,D)
+                    call plan_thread(p, w, slot)
+                    c => w(1:nc)
+                    d => w(nc + 1:)
                     if (.not. present(out)) then
-                        call zfft1d0_64(a, a, b, c, c, d, wx, wy, b(n + 1), nx, ny, lnx, lny)
+                        call zfft1d0_64(a, a, b, c, c, d, p%wx, p%wy, p%w, nx, ny, &
+                                        p%lp(:, 1), p%lp(:, 2))
                     else if (iopt == juffte_bw) then
-                        call zfft1d0_64(out, out, b, c, c, d, wx, wy, b(n + 1), nx, ny, lnx, lny)
+                        call zfft1d0_64(out, out, b, c, c, d, p%wx, p%wy, p%w, nx, ny, &
+                                        p%lp(:, 1), p%lp(:, 2))
                     else
-                        call zfft1d0_64(a, out, b, c, c, d, wx, wy, b(n + 1), nx, ny, lnx, lny)
+                        call zfft1d0_64(a, out, b, c, c, d, p%wx, p%wy, p%w, nx, ny, &
+                                        p%lp(:, 1), p%lp(:, 2))
                     end if
-                    deallocate(c, d)
+                    call plan_thread_end(p, w, slot)
 !$OMP END PARALLEL
     end if
 
@@ -137,10 +114,32 @@ subroutine zfft1d_64(a, n, iopt, out)
             end do
         end if
     end if
-
-return
+    call plan_end(p, b)
 
 end subroutine zfft1d_64
+
+! The tables of a length-n plan: those of fft235, or for the six-step algorithm (n = nx ny)
+! those of both factors and the twiddles between the steps.
+subroutine build_64(p)
+    type(plan_t), intent(inout) :: p
+    integer :: n, nx, ny
+
+    n = p%n(1)
+    if (n <= l2size/16/3) then
+        call radices(n, p%lp(:, 1))
+        allocate(p%w(n))
+        call settbl(p%w, n)
+    else
+        call getnxny(n, nx, ny)
+        call radices(nx, p%lp(:, 1))
+        call radices(ny, p%lp(:, 2))
+        allocate(p%wx(nx), p%wy(ny), p%w(n))
+        p%nthread = (max(nx, ny) + NP)*NBLK + max(nx, ny)
+        call settbl(p%wx, nx)
+        call settbl(p%wy, ny)
+        call settbl2(p%w, nx, ny)
+    end if
+end subroutine build_64
 
 subroutine zfft1d0_64(a, ayx, b, cx, cy, d, wx, wy, w, nx, ny, lnx, lny)
     use param
@@ -191,27 +190,22 @@ subroutine zfft1d0_64(a, ayx, b, cx, cy, d, wx, wy, w, nx, ny, lnx, lny)
     return
 end subroutine zfft1d0_64
 
-subroutine zfft1d_32(a, n, iopt, out)
+subroutine zfft1d_32(a, n, iopt, out, plan)
     use param
     implicit none
 
     complex(real32), intent(inout)        :: a(*)
     complex(real32), optional,intent(out) :: out(*)
+    type(juffte_plan), intent(inout), optional :: plan
     integer, intent(in)              :: n, iopt
-    complex(real32), allocatable          :: c(:), d(:)
-#ifdef SPRL
-    integer,save                     :: ip(16), lnx(16), lny(16)
-#else
-    integer                          :: ip(3), lnx(3), lny(3)
-#endif
-    complex(real32), save                 :: wx(NDA2), wy(NDA2)
+    complex(real32), pointer, contiguous  :: w(:), c(:), d(:)
+    complex(real32), pointer, contiguous  :: b(:)
+    type(plan_t), pointer            :: p
     real(real32)                          :: dn
-    integer                          :: i, nx, ny
+    integer                          :: i, nx, ny, nc, slot
 
-    if (iopt == juffte_init) then
-        call check_size('zfft1d', n)
-        allocate(b_r32(n*2))
-    end if
+    call plan_begin(plans, 'zfft1d', [n], iopt, p, b, n, build_32, plan=plan)
+    if (iopt == juffte_init .or. iopt == juffte_destroy) return
 
     if (iopt == juffte_bw) then
         if (present(out)) then
@@ -229,57 +223,39 @@ subroutine zfft1d_32(a, n, iopt, out)
         end if
     end if
 
-    if (n <= l2size/16/3) then
-        if (iopt == juffte_init) then
-#ifdef SPRL
-            call factor2(n, ip)
-#endif
-            call settbl_r32(b_r32(n + 1), n)
-            return
-        end if
-#ifndef SPRL
-            call factor(n, ip)
-#endif
+    if (.not. allocated(p%wx_r32)) then  ! fft235 alone, see build_32
         if (present(out)) then
 
             if (iopt == juffte_bw) then
-                call fft235_r32( out, b_r32, b_r32(n + 1), n, ip)
+                call fft235_r32( out, b, p%w_r32, n, p%lp(:, 1))
             else
-                call fft235_o_r32( a, b_r32, b_r32(n + 1), n, ip, out)
+                call fft235_o_r32( a, b, p%w_r32, n, p%lp(:, 1), out)
             end if
         else
-            call fft235_r32(a, b_r32, b_r32(n + 1), n, ip)
+            call fft235_r32(a, b, p%w_r32, n, p%lp(:, 1))
         end if
     else
-                    call getnxny(n, nx, ny)
+                    nx = size(p%wx_r32)
+                    ny = size(p%wy_r32)
 
-                    if (iopt == juffte_init) then
-#ifdef SPRL
-                    call factor2(nx,lnx)
-                    call factor2(ny,lny)
-#endif
-                        call settbl_r32(wx, nx)
-                        call settbl_r32(wy, ny)
-                        call settbl2_r32(b_r32(n + 1), nx, ny)
-                        return
-                    end if
-#ifndef SPRL
-                    call factor(nx, lnx)
-                    call factor(ny, lny)
-#endif
-
-                    ! Per-thread work arrays on the heap: as fixed-size locals they took
-                    ! ~17 MB of stack. Out of place backward, out already holds conj(a).
-!$OMP PARALLEL PRIVATE(C,D)
-                    allocate(c((max(nx, ny) + NP)*NBLK), d(max(nx, ny)))
+                    ! The thread's work arrays, in its slot of the plan. Out of place backward, out
+                    ! already holds conj(a).
+                    nc = (max(nx, ny) + NP)*NBLK
+!$OMP PARALLEL PRIVATE(W,SLOT,C,D)
+                    call plan_thread(p, w, slot)
+                    c => w(1:nc)
+                    d => w(nc + 1:)
                     if (.not. present(out)) then
-                        call zfft1d0_32(a, a, b_r32, c, c, d, wx, wy, b_r32(n + 1), nx, ny, lnx, lny)
+                        call zfft1d0_32(a, a, b, c, c, d, p%wx_r32, p%wy_r32, p%w_r32, nx, ny, &
+                                        p%lp(:, 1), p%lp(:, 2))
                     else if (iopt == juffte_bw) then
-                        call zfft1d0_32(out, out, b_r32, c, c, d, wx, wy, b_r32(n + 1), nx, ny, lnx, lny)
+                        call zfft1d0_32(out, out, b, c, c, d, p%wx_r32, p%wy_r32, p%w_r32, nx, ny, &
+                                        p%lp(:, 1), p%lp(:, 2))
                     else
-                        call zfft1d0_32(a, out, b_r32, c, c, d, wx, wy, b_r32(n + 1), nx, ny, lnx, lny)
+                        call zfft1d0_32(a, out, b, c, c, d, p%wx_r32, p%wy_r32, p%w_r32, nx, ny, &
+                                        p%lp(:, 1), p%lp(:, 2))
                     end if
-                    deallocate(c, d)
+                    call plan_thread_end(p, w, slot)
 !$OMP END PARALLEL
     end if
 
@@ -302,10 +278,32 @@ subroutine zfft1d_32(a, n, iopt, out)
             end do
         end if
     end if
-
-return
+    call plan_end(p, b)
 
 end subroutine zfft1d_32
+
+! The tables of a length-n plan: those of fft235, or for the six-step algorithm (n = nx ny)
+! those of both factors and the twiddles between the steps.
+subroutine build_32(p)
+    type(plan_t), intent(inout) :: p
+    integer :: n, nx, ny
+
+    n = p%n(1)
+    if (n <= l2size/16/3) then
+        call radices(n, p%lp(:, 1))
+        allocate(p%w_r32(n))
+        call settbl_r32(p%w_r32, n)
+    else
+        call getnxny(n, nx, ny)
+        call radices(nx, p%lp(:, 1))
+        call radices(ny, p%lp(:, 2))
+        allocate(p%wx_r32(nx), p%wy_r32(ny), p%w_r32(n))
+        p%nthread = (max(nx, ny) + NP)*NBLK + max(nx, ny)
+        call settbl_r32(p%wx_r32, nx)
+        call settbl_r32(p%wy_r32, ny)
+        call settbl2_r32(p%w_r32, nx, ny)
+    end if
+end subroutine build_32
 
 subroutine zfft1d0_32(a, ayx, b, cx, cy, d, wx, wy, w, nx, ny, lnx, lny)
     use param

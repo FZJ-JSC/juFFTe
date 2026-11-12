@@ -66,13 +66,10 @@ T = ./juffte_test_c
 # Exit status 77: no reference at this size (N >= 4000 without FFTW), not a failure.
 test : juffte_test_c
 	set -e; t() { $(T) "$$@" || [ $$? -eq 77 ]; }; for d in fw bw; do \
-	    for s in $(SIZES_1D); do t -t complex -d $$d $$s; t -t real -d $$d $$s; \
-	        t -t complex -d $$d -a fftw $$s; done; \
-	    for s in $(SIZES_2D) $(SIZES_3D); do t -t complex -d $$d $$s; t -t real -d $$d $$s; \
-	        t -t complex -d $$d -a fftw $$s; done; \
-	    for s in $(SIZES_SIXSTEP); do t -t complex -d $$d $$s; t -t complex -d $$d -a fftw $$s; \
-	        done; \
+	    for s in $(SIZES_1D) $(SIZES_2D) $(SIZES_3D) $(SIZES_SIXSTEP); do \
+	        t -t complex -d $$d $$s; t -t real -d $$d $$s; t -t complex -d $$d -a fftw $$s; done; \
 	done; \
+	for p in $(PLANS); do set -- $$p; t -a fftw -o $$2 $$(echo $$1 | tr x ' '); done; \
 	$(T) 14 2>&1 | grep 'length 14 is not a product of 2, 3 and 5'
 
 clean:

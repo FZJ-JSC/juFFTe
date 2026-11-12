@@ -19,6 +19,7 @@ option(WITH_REFERENCE_FFTW "Build the comparisons against a reference FFTW" OFF)
 option(BUILD_EXAMPLES "Build the example programs in examples/" ON)
 option(THOROUGH_TESTS "Test many more sizes (tests/sizes.mk)" OFF)
 option(WITH_EPI "Vectorise with -mepi if the compiler is EPI's LLVM" ON)
+option(WITH_MPI "Build the distributed transforms (MPI) into libjuffte" OFF)
 
 # =========================
 # Validate options
@@ -164,6 +165,7 @@ set(OBJ_COMMON
     ${CMAKE_CURRENT_SOURCE_DIR}/src/param.F90
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils_m.F90
     ${CMAKE_CURRENT_SOURCE_DIR}/src/factor_m.F90
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/plan_m.F90
     ${CMAKE_CURRENT_SOURCE_DIR}/src/kernel_m.F90
     ${CMAKE_CURRENT_SOURCE_DIR}/src/fft235_m.F90
 )
@@ -222,6 +224,12 @@ endif()
 # FFTW compatibility layer; its symbols are juffte_-prefixed, so it can live here.
 list(APPEND JUFFTE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/juffte_fftw.c)
 
+# The distributed transforms, in libjuffte when built with MPI.
+if(WITH_MPI)
+    find_package(MPI REQUIRED COMPONENTS Fortran)
+    list(APPEND JUFFTE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/pzfft3d_m.F90)
+endif()
+
 
 # =========================
 # Library
@@ -249,6 +257,10 @@ target_include_directories(${LIB_TARGET} PUBLIC
 
 if(OpenMP_Fortran_FOUND)
     target_link_libraries(${LIB_TARGET} PUBLIC OpenMP::OpenMP_Fortran)
+endif()
+if(WITH_MPI)
+    target_compile_definitions(${LIB_TARGET} PRIVATE USE_MPI)
+    target_link_libraries(${LIB_TARGET} PUBLIC MPI::MPI_Fortran)
 endif()
 if(OpenMP_C_FOUND)
     # Compile-only: OpenMP::OpenMP_C in the link interface would force every
@@ -364,18 +376,27 @@ foreach(line IN LISTS size_lines)
     set(JUFFTE_${name} ${entries})
 endforeach()
 
-# One case per process, named like f_real_bw_9x96 or c_complex_fw_1024_fftw: a second
-# size in one process hits the single-plan limit. Without FFTW, sizes with N >= 4000
-# have no reference and are reported as skipped (exit status 77). The thorough sizes
-# carry the label "thorough" (ctest -L thorough / -LE thorough).
+# One case per process, named like f_real_bw_9x96, c_complex_fw_1024_fftw,
+# c_complex_bw_96_with_100 (-o 100) or f_complex_fw_96_threads (-p). Without FFTW, sizes
+# with N >= 4000 have no reference and are reported as skipped (exit status 77). The
+# thorough sizes carry the label "thorough" (ctest -L thorough / -LE thorough).
 function(juffte_add_test lang type dir size label)
     string(REPLACE " " ";" n "${size}")
     string(REPLACE " " "x" tag "${size}")
     set(name ${lang}_${type}_${dir}_${tag})
-    if(ARGN)
-        list(GET ARGN 1 api)
-        set(name ${name}_${api})
-    endif()
+    set(args ${ARGN})
+    while(args)
+        list(POP_FRONT args opt)
+        if(opt STREQUAL "-p")
+            string(APPEND name _threads)
+        elseif(opt STREQUAL "-o")
+            list(POP_FRONT args val)
+            string(APPEND name _with_${val})
+        else()
+            list(POP_FRONT args val)
+            string(APPEND name _${val})
+        endif()
+    endwhile()
     add_test(NAME ${name} COMMAND juffte_test_${lang} -t ${type} -d ${dir} ${ARGN} ${n})
     # Do not add PASS_REGULAR_EXPRESSION: it makes CTest ignore the exit status and
     # report failures as passes.
@@ -383,17 +404,20 @@ function(juffte_add_test lang type dir size label)
                                             LABELS ${label})
 endfunction()
 
-# Every case for one size: complex, real and the FFTW layer from both languages, and
-# fft_init/fft_execute in 1-D. COMPLEX_ONLY leaves out the real transforms.
+# Every case for one size: complex, real and the FFTW layer from both languages, the
+# native API with a plan of the caller's own (plan=) from Fortran, and fft_init/fft_execute
+# in 1-D.
 function(juffte_add_size size label)
     string(REPLACE " " ";" n "${size}")
     list(LENGTH n dim)
     foreach(lang c f)
         foreach(dir fw bw)
-            juffte_add_test(${lang} complex ${dir} "${size}" ${label})
-            if(NOT "${ARGN}" STREQUAL "COMPLEX_ONLY")
-                juffte_add_test(${lang} real ${dir} "${size}" ${label})
-            endif()
+            foreach(type complex real)
+                juffte_add_test(${lang} ${type} ${dir} "${size}" ${label})
+                if(lang STREQUAL "f")
+                    juffte_add_test(${lang} ${type} ${dir} "${size}" ${label} -a plan)
+                endif()
+            endforeach()
             juffte_add_test(${lang} complex ${dir} "${size}" ${label} -a fftw)
             if(lang STREQUAL "f" AND dim EQUAL 1)
                 juffte_add_test(${lang} complex ${dir} "${size}" ${label} -a simple)
@@ -408,13 +432,63 @@ if(THOROUGH_TESTS)
 endif()
 foreach(kind IN LISTS kinds)
     string(TOLOWER ${kind} label)
-    foreach(size IN LISTS JUFFTE_${kind}_1D JUFFTE_${kind}_2D JUFFTE_${kind}_3D)
+    foreach(size IN LISTS JUFFTE_${kind}_1D JUFFTE_${kind}_2D JUFFTE_${kind}_3D
+                          JUFFTE_${kind}_SIXSTEP)
         juffte_add_size("${size}" ${label})
     endforeach()
-    foreach(size IN LISTS JUFFTE_${kind}_SIXSTEP)
-        juffte_add_size("${size}" ${label} COMPLEX_ONLY)
-    endforeach()
 endforeach()
+
+# Several plans at once, label "plans". Each pair of PLANS is a shape to check and one to
+# make plans of around it (-o). Whether one plan disturbs another depends neither on the
+# direction nor on the language of the native call (the C one is a thin wrapper), so these
+# run forward, natively from Fortran, with plan=, and through both FFTW layers. The THREADS
+# sizes run from four threads at once (-p): natively, each thread with its own references
+# to the shared plans, and with plan= and the FFTW layer, all on one plan.
+# fft_init/fft_execute only take 1-D shapes.
+function(juffte_add_plans pair)
+    string(REPLACE " " ";" shapes "${pair}")
+    list(GET shapes 0 shape)
+    list(GET shapes 1 other)
+    string(REPLACE "x" " " shape "${shape}")
+    foreach(type complex real)
+        juffte_add_test(f ${type} fw "${shape}" plans -o ${other})
+        juffte_add_test(f ${type} fw "${shape}" plans -a plan -o ${other})
+    endforeach()
+    foreach(lang c f)
+        juffte_add_test(${lang} complex fw "${shape}" plans -a fftw -o ${other})
+    endforeach()
+    if(NOT pair MATCHES "x")
+        juffte_add_test(f complex fw "${shape}" plans -a simple -o ${other})
+    endif()
+endfunction()
+
+function(juffte_add_threads size)
+    foreach(dir fw bw)
+        foreach(type complex real)
+            juffte_add_test(f ${type} ${dir} "${size}" plans -p)
+            juffte_add_test(f ${type} ${dir} "${size}" plans -a plan -p)
+        endforeach()
+        juffte_add_test(f complex ${dir} "${size}" plans -a fftw -p)
+        if(NOT size MATCHES " ")
+            juffte_add_test(f complex ${dir} "${size}" plans -a simple -p)
+        endif()
+    endforeach()
+endfunction()
+
+foreach(pair IN LISTS JUFFTE_PLANS)
+    juffte_add_plans("${pair}")
+endforeach()
+foreach(size IN LISTS JUFFTE_THREADS)
+    juffte_add_threads("${size}")
+endforeach()
+
+# The plans themselves where the transform tests cannot reach them in a deterministic way
+# (tests/fortran/plan_test.F90). MALLOC_PERTURB_ makes a plan freed too early show.
+add_executable(plan_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/fortran/plan_test.F90)
+target_link_libraries(plan_test PRIVATE ${LIB_TARGET})
+add_test(NAME f_plan_internals COMMAND plan_test)
+set_tests_properties(f_plan_internals PROPERTIES ENVIRONMENT MALLOC_PERTURB_=165
+                                                 FAIL_REGULAR_EXPRESSION "FAIL" LABELS plans)
 
 # A length the library cannot handle must stop it with a message. Here, and only here,
 # the output decides: the exit status is that of the library's error stop.
@@ -423,12 +497,71 @@ foreach(lang c f)
     set_tests_properties(${lang}_rejects_length_14 PROPERTIES
         PASS_REGULAR_EXPRESSION "length 14 is not a product of 2, 3 and 5")
 endforeach()
+foreach(case "unmade|zfft1d: plan= holds no plan"
+             "other-shape|zfft1d: plan= holds a zfft1d plan for length 16 in FP64, not a zfft1d plan for length 32"
+             "other-transform|dzfft2d: plan= holds a zfft2d plan for 4 x 4 in FP64, not a dzfft2d plan"
+             "too-large|zfft3d: 2048 x 2048 x 1024 has more than 2147483647 elements"
+             "work-too-large|zfft2d: 2 x 134217728 needs per-thread work arrays of more than"
+             "bad-iopt|zfft1d: iopt is -2; use juffte_init")
+    string(REPLACE "|" ";" case "${case}")
+    list(GET case 0 what)
+    list(GET case 1 message)
+    add_test(NAME f_rejects_plan_${what} COMMAND plan_test ${what})
+    set_tests_properties(f_rejects_plan_${what} PROPERTIES PASS_REGULAR_EXPRESSION "${message}")
+endforeach()
+
+# The distributed transforms (WITH_MPI), label "mpi": each size of MPI_2D and MPI_3D on each
+# of MPI_RANKS ranks of two threads, against the serial transform. MPIEXEC_PREFLAGS passes
+# options such as --oversubscribe to mpiexec.
+set(test_targets juffte_test_c juffte_test_f plan_test)
+if(WITH_MPI)
+    add_executable(juffte_mpi_test_f ${CMAKE_CURRENT_SOURCE_DIR}/tests/fortran/juffte_mpi_test.F90)
+    target_link_libraries(juffte_mpi_test_f PRIVATE ${LIB_TARGET})
+    list(APPEND test_targets juffte_mpi_test_f)
+
+    function(juffte_add_mpi_test name np)
+        add_test(NAME ${name} COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${np}
+                 ${MPIEXEC_PREFLAGS} $<TARGET_FILE:juffte_mpi_test_f> ${MPIEXEC_POSTFLAGS} ${ARGN})
+        math(EXPR threads "2 * ${np}")
+        # A rank that stops leaves the others waiting in MPI: fail after 5 minutes.
+        set_tests_properties(${name} PROPERTIES ENVIRONMENT OMP_NUM_THREADS=2
+                                                PROCESSORS ${threads} TIMEOUT 300 LABELS mpi)
+    endfunction()
+
+    foreach(np IN LISTS JUFFTE_MPI_RANKS)
+        foreach(size IN LISTS JUFFTE_MPI_2D JUFFTE_MPI_3D)
+            string(REPLACE " " ";" n "${size}")
+            string(REPLACE " " "x" tag "${size}")
+            foreach(dir fw bw)
+                juffte_add_mpi_test(mpi_f_complex_${dir}_${tag}_np${np} ${np} -d ${dir} ${n})
+                set_tests_properties(mpi_f_complex_${dir}_${tag}_np${np} PROPERTIES
+                                     FAIL_REGULAR_EXPRESSION "FAIL")
+            endforeach()
+        endforeach()
+    endforeach()
+    # Sizes the ranks do not divide, and a plan run on another communicator, stop every rank
+    # with a message. Their timeout is 30 seconds: when all ranks stop at once, the launcher
+    # of Open MPI 5.0.9 (prterun, PRRTE 3.0.6) now and then hangs instead of ending the job,
+    # about once in 400 runs.
+    foreach(case "12x12x10|4|12;12;10|pzfft3d: nx = 12 and nz = 10 on 4 ranks"
+                 "12x10|4|12;10|pzfft2d: nx = 12 and ny = 10 on 4 ranks"
+                 "other_comm|2|-c;12;12;12|pzfft3d: plan= was made on another communicator")
+        string(REPLACE "|" ";" case "${case}")
+        list(GET case 0 what)
+        list(GET case 1 np)
+        list(SUBLIST case 2 -1 rest)
+        list(POP_BACK rest message)
+        juffte_add_mpi_test(mpi_f_rejects_${what} ${np} ${rest})
+        set_tests_properties(mpi_f_rejects_${what} PROPERTIES PASS_REGULAR_EXPRESSION "${message}"
+                                                             TIMEOUT 30)
+    endforeach()
+endif()
 
 add_custom_target(run_tests
     COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running tests:"
-    DEPENDS juffte_test_c juffte_test_f
+    DEPENDS ${test_targets}
 )
 
 # =========================
@@ -474,6 +607,7 @@ message(STATUS "  Reference FFTW:    ${WITH_REFERENCE_FFTW}")
 message(STATUS "  Examples:          ${BUILD_EXAMPLES}")
 message(STATUS "  Fortran compiler:  ${CMAKE_Fortran_COMPILER}")
 message(STATUS "  OpenMP:            ${OpenMP_Fortran_FOUND}")
+message(STATUS "  MPI:               ${WITH_MPI}")
 message(STATUS "  Cross compiling:   ${CMAKE_CROSSCOMPILING}")
 message(STATUS "  Install prefix:    ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "------------------------------------------------------------")
