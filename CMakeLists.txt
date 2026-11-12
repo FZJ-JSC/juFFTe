@@ -19,6 +19,7 @@ option(WITH_REFERENCE_FFTW "Build the comparisons against a reference FFTW" OFF)
 option(BUILD_EXAMPLES "Build the example programs in examples/" ON)
 option(THOROUGH_TESTS "Test many more sizes (tests/sizes.mk)" OFF)
 option(WITH_EPI "Vectorise with -mepi if the compiler is EPI's LLVM" ON)
+option(WITH_MPI "Build the distributed transforms (MPI) into libjuffte" OFF)
 
 # =========================
 # Validate options
@@ -223,6 +224,12 @@ endif()
 # FFTW compatibility layer; its symbols are juffte_-prefixed, so it can live here.
 list(APPEND JUFFTE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/juffte_fftw.c)
 
+# The distributed transforms, in libjuffte when built with MPI.
+if(WITH_MPI)
+    find_package(MPI REQUIRED COMPONENTS Fortran)
+    list(APPEND JUFFTE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/pzfft3d_m.F90)
+endif()
+
 
 # =========================
 # Library
@@ -250,6 +257,10 @@ target_include_directories(${LIB_TARGET} PUBLIC
 
 if(OpenMP_Fortran_FOUND)
     target_link_libraries(${LIB_TARGET} PUBLIC OpenMP::OpenMP_Fortran)
+endif()
+if(WITH_MPI)
+    target_compile_definitions(${LIB_TARGET} PRIVATE USE_MPI)
+    target_link_libraries(${LIB_TARGET} PUBLIC MPI::MPI_Fortran)
 endif()
 if(OpenMP_C_FOUND)
     # Compile-only: OpenMP::OpenMP_C in the link interface would force every
@@ -499,11 +510,58 @@ foreach(case "unmade|zfft1d: plan= holds no plan"
     set_tests_properties(f_rejects_plan_${what} PROPERTIES PASS_REGULAR_EXPRESSION "${message}")
 endforeach()
 
+# The distributed transforms (WITH_MPI), label "mpi": each size of MPI_2D and MPI_3D on each
+# of MPI_RANKS ranks of two threads, against the serial transform. MPIEXEC_PREFLAGS passes
+# options such as --oversubscribe to mpiexec.
+set(test_targets juffte_test_c juffte_test_f plan_test)
+if(WITH_MPI)
+    add_executable(juffte_mpi_test_f ${CMAKE_CURRENT_SOURCE_DIR}/tests/fortran/juffte_mpi_test.F90)
+    target_link_libraries(juffte_mpi_test_f PRIVATE ${LIB_TARGET})
+    list(APPEND test_targets juffte_mpi_test_f)
+
+    function(juffte_add_mpi_test name np)
+        add_test(NAME ${name} COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${np}
+                 ${MPIEXEC_PREFLAGS} $<TARGET_FILE:juffte_mpi_test_f> ${MPIEXEC_POSTFLAGS} ${ARGN})
+        math(EXPR threads "2 * ${np}")
+        # A rank that stops leaves the others waiting in MPI: fail after 5 minutes.
+        set_tests_properties(${name} PROPERTIES ENVIRONMENT OMP_NUM_THREADS=2
+                                                PROCESSORS ${threads} TIMEOUT 300 LABELS mpi)
+    endfunction()
+
+    foreach(np IN LISTS JUFFTE_MPI_RANKS)
+        foreach(size IN LISTS JUFFTE_MPI_2D JUFFTE_MPI_3D)
+            string(REPLACE " " ";" n "${size}")
+            string(REPLACE " " "x" tag "${size}")
+            foreach(dir fw bw)
+                juffte_add_mpi_test(mpi_f_complex_${dir}_${tag}_np${np} ${np} -d ${dir} ${n})
+                set_tests_properties(mpi_f_complex_${dir}_${tag}_np${np} PROPERTIES
+                                     FAIL_REGULAR_EXPRESSION "FAIL")
+            endforeach()
+        endforeach()
+    endforeach()
+    # Sizes the ranks do not divide, and a plan run on another communicator, stop every rank
+    # with a message. Their timeout is 30 seconds: when all ranks stop at once, the launcher
+    # of Open MPI 5.0.9 (prterun, PRRTE 3.0.6) now and then hangs instead of ending the job,
+    # about once in 400 runs.
+    foreach(case "12x12x10|4|12;12;10|pzfft3d: nx = 12 and nz = 10 on 4 ranks"
+                 "12x10|4|12;10|pzfft2d: nx = 12 and ny = 10 on 4 ranks"
+                 "other_comm|2|-c;12;12;12|pzfft3d: plan= was made on another communicator")
+        string(REPLACE "|" ";" case "${case}")
+        list(GET case 0 what)
+        list(GET case 1 np)
+        list(SUBLIST case 2 -1 rest)
+        list(POP_BACK rest message)
+        juffte_add_mpi_test(mpi_f_rejects_${what} ${np} ${rest})
+        set_tests_properties(mpi_f_rejects_${what} PROPERTIES PASS_REGULAR_EXPRESSION "${message}"
+                                                             TIMEOUT 30)
+    endforeach()
+endif()
+
 add_custom_target(run_tests
     COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running tests:"
-    DEPENDS juffte_test_c juffte_test_f plan_test
+    DEPENDS ${test_targets}
 )
 
 # =========================
@@ -549,6 +607,7 @@ message(STATUS "  Reference FFTW:    ${WITH_REFERENCE_FFTW}")
 message(STATUS "  Examples:          ${BUILD_EXAMPLES}")
 message(STATUS "  Fortran compiler:  ${CMAKE_Fortran_COMPILER}")
 message(STATUS "  OpenMP:            ${OpenMP_Fortran_FOUND}")
+message(STATUS "  MPI:               ${WITH_MPI}")
 message(STATUS "  Cross compiling:   ${CMAKE_CROSSCOMPILING}")
 message(STATUS "  Install prefix:    ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "------------------------------------------------------------")

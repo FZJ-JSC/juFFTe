@@ -40,6 +40,15 @@ ifeq ($(WITHSPRL), 1)
 	endif
 endif
 
+# The distributed transforms, built into the library with the MPI compiler wrapper:
+# make WITHMPI=1 FC=mpif90.
+WITHMPI ?= 0
+MPIOBJ =
+ifeq ($(WITHMPI), 1)
+	FCFLAGS += -DUSE_MPI
+	MPIOBJ = pzfft3d_m.o
+endif
+
 ifneq (,$(filter $(FC),ifort ifx))
 	FCFLAGS += 
 # add -xCORE-AVX512 -qopt-zmm-usage=high for AVX-512
@@ -78,8 +87,8 @@ FCFLAGS  += $(OMPFLAGS)
 PREFIX ?= /usr/
 
 
-OBJ    = utils_m.o param.o factor_m.o plan_m.o kernel_m.o fft235_m.o  zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o juffte.o juffte_fftw.o
-OBJSP  = utils_m.o param.o factor_m.o plan_m.o kernel_m.o fft235s_m.o zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o juffte.o juffte_fftw.o
+OBJ    = utils_m.o param.o factor_m.o plan_m.o kernel_m.o fft235_m.o  zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o $(MPIOBJ) juffte.o juffte_fftw.o
+OBJSP  = utils_m.o param.o factor_m.o plan_m.o kernel_m.o fft235s_m.o zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o $(MPIOBJ) juffte.o juffte_fftw.o
 OBJSPC = $(patsubst %.c, %.o, $(notdir $(wildcard $(SPRLPATH)/*.c)))
 
 all: $(LIBS) juffte.mk
@@ -132,8 +141,10 @@ dzfft3d_m.o : dzfft3d_m.F90 $(FFT235) plan_m.o param.o
 	$(FC) $(FCFLAGS) -I. -c $<
 zdfft3d_m.o : zdfft3d_m.F90 $(FFT235) plan_m.o param.o
 	$(FC) $(FCFLAGS) -I. -c $<
+pzfft3d_m.o : pzfft3d_m.F90 $(FFT235) factor_m.o plan_m.o param.o
+	$(FC) $(FCFLAGS) -I. -c $<
 juffte.o : juffte.F90 zfft1d_m.o zfft2d_m.o zfft3d_m.o dzfft2d_m.o zdfft2d_m.o dzfft3d_m.o zdfft3d_m.o \
-           plan_m.o factor_m.o utils_m.o param.o
+           $(MPIOBJ) plan_m.o factor_m.o utils_m.o param.o
 	$(FC) $(FCFLAGS) -I. -c $<
 juffte_fftw.o : juffte_fftw.c juffte.h
 	$(CC) $(CFLAGS) -c $<

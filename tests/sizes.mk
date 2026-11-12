@@ -28,6 +28,14 @@ PLANS = "96 100" "100 96" "96 96" "9x96 20x60" "20x60 9x96" "9x96 9x96" "96 9x96
         "100 96x100" "1024 262144" "262144 196608"
 THREADS = 96 1000 65536 "20 60" "1024 729" "9 16 20" "64 64 64" 262144
 
+# The distributed transforms (CMake -DWITH_MPI=ON, make mpitest), each on each of MPI_RANKS
+# ranks: 2-D (pzfft2d) and 3-D (pzfft3d). The ranks must divide nx and the last size, so
+# these are multiples of 12; 12x5x12 leaves 3 values of x to a rank on 4 ranks, fewer than
+# a block of lines (NBLK).
+MPI_2D = "48 36" "120 60" "12 12"
+MPI_3D = "24 10 36" "60 16 48" "120 64 96" "12 5 12"
+MPI_RANKS = 1 2 3 4
+
 # Added by -DTHOROUGH_TESTS=ON or `make test THOROUGH=1`: every 2-3-5 length up to 128,
 # powers of each radix, lengths past the former size caps (65536 in 1-D real and 2-D, 4096
 # per 3-D dimension), and lopsided shapes.

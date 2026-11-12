@@ -12,6 +12,9 @@ use dzfft2d_m
 use zdfft2d_m
 use dzfft3d_m
 use zdfft3d_m
+#ifdef USE_MPI
+use pzfft3d_m
+#endif
 use plan_m, only: juffte_plan
 use factor_m
 use utils_m

@@ -89,5 +89,19 @@ test : juffte_test_f plan_test
 	./plan_test work-too-large 2>&1 | grep 'zfft2d: 2 x 134217728 needs per-thread work arrays of more than'; \
 	./plan_test bad-iopt 2>&1 | grep 'zfft1d: iopt is -2; use juffte_init (0), juffte_fw (-1), juffte_bw (1) or juffte_destroy (2)'
 
+# The distributed transforms, against a library built with WITHMPI=1:
+#   make mpitest FC=mpif90 [MPIEXEC="mpiexec --oversubscribe"]
+MPIEXEC ?= mpiexec
+juffte_mpi_test_f : juffte_mpi_test.F90
+	$(FC) $(FCFLAGS) $< $(LIBFLAGS) -o $@
+
+mpitest : juffte_mpi_test_f
+	set -e; for np in $(MPI_RANKS); do for s in $(MPI_2D) $(MPI_3D); do for d in fw bw; do \
+	    OMP_NUM_THREADS=2 $(MPIEXEC) -n $$np ./juffte_mpi_test_f -d $$d $$s; \
+	done; done; done; \
+	$(MPIEXEC) -n 4 ./juffte_mpi_test_f 12 12 10 2>&1 | grep 'pzfft3d: nx = 12 and nz = 10 on 4 ranks'; \
+	$(MPIEXEC) -n 4 ./juffte_mpi_test_f 12 10 2>&1 | grep 'pzfft2d: nx = 12 and ny = 10 on 4 ranks'; \
+	$(MPIEXEC) -n 2 ./juffte_mpi_test_f -c 12 12 12 2>&1 | grep 'pzfft3d: plan= was made on another communicator'
+
 clean:
-	rm -f juffte_test_f plan_test *.o *.mod
+	rm -f juffte_test_f plan_test juffte_mpi_test_f *.o *.mod
