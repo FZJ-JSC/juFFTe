@@ -7,7 +7,7 @@ module dzfft2d_m
 
 use, intrinsic :: iso_fortran_env
 use param
-use factor_m
+use plan_m
 #ifdef SPRL
 use fft235s_m
 #else
@@ -16,62 +16,77 @@ use fft235_m
 
 implicit none
 
-complex(real64), allocatable :: b (:) ! WORK/COEFFICIENT VECTOR
-complex(real32), allocatable :: b_r32 (:)
-complex(real64), allocatable :: c (:)
-!$OMP THREADPRIVATE(c)
-complex(real32), allocatable :: c_r32 (:)
-!$OMP THREADPRIVATE(c_r32)
+type(plan_t), pointer :: plans => null()
 private
-public :: dzfft2d, dzfft2d_64, dzfft2d_32
+public :: dzfft2d, dzfft2d_64, dzfft2d_32, dzfft1d, dzfft1d_64, dzfft1d_32
 
 interface dzfft2d
   module procedure dzfft2d_64, dzfft2d_32
 end interface
 
+interface dzfft1d
+  module procedure dzfft1d_64, dzfft1d_32
+end interface
+
 contains
 
-subroutine dzfft2d_64(a, a_c, nx, ny, iopt)
+subroutine dzfft2d_64(a, a_c, nx, ny, iopt, plan)
 
     implicit none
 
     real(real64), intent(in) :: a(*)
     complex(real64), intent(inout) :: a_c(*)
     integer, intent(in) :: nx, ny, iopt
-    ! complex(real64) :: c((NDA2 + NP)*NBLK), d(NDA2)
-    complex(real64) :: d(NDA2)
-    complex(real64), save :: wx(NDA2), wy(NDA2)
-#ifdef SPRL
-    integer, save :: lnx(16), lny(16)
-#else
-    integer :: lnx(3), lny(3)
-#endif
+    type(juffte_plan), intent(inout), optional :: plan
 
-    if (iopt == juffte_init) then
-        call check_size('dzfft2d', nx, NDA2)
-        call check_size('dzfft2d', ny, NDA2)
-
-        allocate (b(nx*ny*2))
-!$OMP PARALLEL
-        allocate(c((NDA2 + NP)*NBLK))
-!$OMP END PARALLEL
-#ifdef SPRL
-        call factor2(nx,lnx)
-        call factor2(ny,lny)
-#endif
-        call settbl(wx, nx)
-        call settbl(wy, ny)
-        return
-    end if
-#ifndef SPRL
-    call factor(nx, lnx)
-    call factor(ny, lny)
-#endif
-!$OMP PARALLEL PRIVATE(D)
-    call dzfft2d0_64(a, a_c, b, c, c, d, wx, wy, nx, ny, lnx, lny)
-!$OMP END PARALLEL
-    return
+    call dzfft_64(a, a_c, nx, ny, iopt, 'dzfft2d', [nx, ny], plan)
 end subroutine dzfft2d_64
+
+! The 1-D r2c transform of length n: the 2-D one with one row, planned as 1-D.
+subroutine dzfft1d_64(a, a_c, n, iopt, plan)
+
+    implicit none
+
+    real(real64), intent(in) :: a(*)
+    complex(real64), intent(inout) :: a_c(*)
+    integer, intent(in) :: n, iopt
+    type(juffte_plan), intent(inout), optional :: plan
+
+    call dzfft_64(a, a_c, n, 1, iopt, 'dzfft1d', [n], plan)
+end subroutine dzfft1d_64
+
+! dzfft2d of nx x ny, or dzfft1d of length nx with ny = 1; routine and shape are those of the
+! call, for the plan and the messages.
+subroutine dzfft_64(a, a_c, nx, ny, iopt, routine, shape, plan)
+
+    implicit none
+
+    real(real64), intent(in) :: a(*)
+    complex(real64), intent(inout) :: a_c(*)
+    integer, intent(in) :: nx, ny, iopt
+    character(len=*), intent(in) :: routine
+    integer, intent(in) :: shape(:)
+    type(juffte_plan), intent(inout), optional :: plan
+    complex(real64), pointer, contiguous :: w(:), c(:), d(:)
+    integer(int64) :: nc
+    integer :: slot
+    complex(real64), pointer, contiguous :: b(:)
+    type(plan_t), pointer :: p
+
+    nc = max(int(nx, int64), (int(ny, int64) + NP)*NBLK)
+    call plan_begin(plans, routine, shape, iopt, p, b, (nx/2 + 1)*ny, nthread=nc + max(nx, ny), plan=plan)
+    if (iopt == juffte_init .or. iopt == juffte_destroy) return
+    ! The thread's work arrays, in its slot of the plan.
+    ! With one row (the 1-D transforms), every thread would transform the same row.
+!$OMP PARALLEL PRIVATE(W,SLOT,C,D) IF(ny > 1)
+    call plan_thread(p, w, slot)
+    c => w(1:nc)
+    d => w(nc + 1:)
+    call dzfft2d0_64(a, a_c, b, c, c, d, p%wx, p%wy, nx, ny, p%lp(:, 1), p%lp(:, 2))
+    call plan_thread_end(p, w, slot)
+!$OMP END PARALLEL
+    call plan_end(p, b)
+end subroutine dzfft_64
 
 subroutine dzfft2d0_64(da, a, b, cx, cy, d, wx, wy, nx, ny, lnx, lny)
 
@@ -113,6 +128,8 @@ subroutine dzfft2d0_64(da, a, b, cx, cy, d, wx, wy, nx, ny, lnx, lny)
                 b(i, j + 1) = (0.0d0, -0.5d0)*(cx(i) - dconjg(cx(nx - i + 2)))
             end do
         end do
+        ! The last row of an odd ny, on one thread; the others wait for it.
+!$OMP SINGLE
         do i = 1, nx
             cx(i) = dcmplx(da(i, ny), 0.0d0)
         end do
@@ -121,6 +138,7 @@ subroutine dzfft2d0_64(da, a, b, cx, cy, d, wx, wy, nx, ny, lnx, lny)
         do i = 1, nx/2 + 1
             b(i, ny) = cx(i)
         end do
+!$OMP END SINGLE
     end if
 !$OMP DO PRIVATE(I,J)
     do ii = 1, nx/2 + 1, NBLK
@@ -143,45 +161,63 @@ subroutine dzfft2d0_64(da, a, b, cx, cy, d, wx, wy, nx, ny, lnx, lny)
     return
 end subroutine dzfft2d0_64
 
-subroutine dzfft2d_32(a, a_c, nx, ny, iopt)
+subroutine dzfft2d_32(a, a_c, nx, ny, iopt, plan)
 
     implicit none
 
     real(real32), intent(in) :: a(*)
     complex(real32), intent(inout) :: a_c(*)
     integer, intent(in) :: nx, ny, iopt
-    complex(real32) :: d(NDA2)
-    complex(real32), save :: wx(NDA2), wy(NDA2)
-#ifdef SPRL
-    integer, save :: lnx(16), lny(16)
-#else
-    integer :: lnx(3), lny(3)
-#endif
+    type(juffte_plan), intent(inout), optional :: plan
 
-    if (iopt == juffte_init) then
-        call check_size('dzfft2d', nx, NDA2)
-        call check_size('dzfft2d', ny, NDA2)
-        allocate (b_r32(nx*ny*2))
-        !$OMP PARALLEL
-        allocate(c_r32((NDA2 + NP)*NBLK))
-!$OMP END PARALLEL
-#ifdef SPRL
-        call factor2(nx,lnx)
-        call factor2(ny,lny)
-#endif
-        call settbl_r32(wx, nx)
-        call settbl_r32(wy, ny)
-        return
-    end if
-#ifndef SPRL
-    call factor(nx, lnx)
-    call factor(ny, lny)
-#endif
-!$OMP PARALLEL PRIVATE(D)
-    call dzfft2d0_32(a, a_c, b_r32, c_r32, c_r32, d, wx, wy, nx, ny, lnx, lny)
-!$OMP END PARALLEL
-    return
+    call dzfft_32(a, a_c, nx, ny, iopt, 'dzfft2d', [nx, ny], plan)
 end subroutine dzfft2d_32
+
+! The 1-D r2c transform of length n: the 2-D one with one row, planned as 1-D.
+subroutine dzfft1d_32(a, a_c, n, iopt, plan)
+
+    implicit none
+
+    real(real32), intent(in) :: a(*)
+    complex(real32), intent(inout) :: a_c(*)
+    integer, intent(in) :: n, iopt
+    type(juffte_plan), intent(inout), optional :: plan
+
+    call dzfft_32(a, a_c, n, 1, iopt, 'dzfft1d', [n], plan)
+end subroutine dzfft1d_32
+
+! dzfft2d of nx x ny, or dzfft1d of length nx with ny = 1; routine and shape are those of the
+! call, for the plan and the messages.
+subroutine dzfft_32(a, a_c, nx, ny, iopt, routine, shape, plan)
+
+    implicit none
+
+    real(real32), intent(in) :: a(*)
+    complex(real32), intent(inout) :: a_c(*)
+    integer, intent(in) :: nx, ny, iopt
+    character(len=*), intent(in) :: routine
+    integer, intent(in) :: shape(:)
+    type(juffte_plan), intent(inout), optional :: plan
+    complex(real32), pointer, contiguous :: w(:), c(:), d(:)
+    integer(int64) :: nc
+    integer :: slot
+    complex(real32), pointer, contiguous :: b(:)
+    type(plan_t), pointer :: p
+
+    nc = max(int(nx, int64), (int(ny, int64) + NP)*NBLK)
+    call plan_begin(plans, routine, shape, iopt, p, b, (nx/2 + 1)*ny, nthread=nc + max(nx, ny), plan=plan)
+    if (iopt == juffte_init .or. iopt == juffte_destroy) return
+    ! The thread's work arrays, in its slot of the plan.
+    ! With one row (the 1-D transforms), every thread would transform the same row.
+!$OMP PARALLEL PRIVATE(W,SLOT,C,D) IF(ny > 1)
+    call plan_thread(p, w, slot)
+    c => w(1:nc)
+    d => w(nc + 1:)
+    call dzfft2d0_32(a, a_c, b, c, c, d, p%wx_r32, p%wy_r32, nx, ny, p%lp(:, 1), p%lp(:, 2))
+    call plan_thread_end(p, w, slot)
+!$OMP END PARALLEL
+    call plan_end(p, b)
+end subroutine dzfft_32
 
 subroutine dzfft2d0_32(da, a, b, cx, cy, d, wx, wy, nx, ny, lnx, lny)
 
@@ -223,6 +259,8 @@ subroutine dzfft2d0_32(da, a, b, cx, cy, d, wx, wy, nx, ny, lnx, lny)
                 b(i, j + 1) = (0.0_real32, -0.5_real32)*(cx(i) - conjg(cx(nx - i + 2)))
             end do
         end do
+        ! The last row of an odd ny, on one thread; the others wait for it.
+!$OMP SINGLE
         do i = 1, nx
             cx(i) = cmplx(da(i, ny), 0.0_real32)
         end do
@@ -231,6 +269,7 @@ subroutine dzfft2d0_32(da, a, b, cx, cy, d, wx, wy, nx, ny, lnx, lny)
         do i = 1, nx/2 + 1
             b(i, ny) = cx(i)
         end do
+!$OMP END SINGLE
     end if
 !$OMP DO PRIVATE(I,J)
     do ii = 1, nx/2 + 1, NBLK

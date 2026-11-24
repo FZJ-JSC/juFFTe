@@ -13,18 +13,29 @@ SIZES_1D = 2 9 96 100 120 1024
 SIZES_2D = "2 2" "9 96" "20 60" "96 64" "120 100" "256 256"
 SIZES_3D = "2 2 2" "9 16 20" "12 18 20" "32 32 32"
 
-# 1-D lengths above L2SIZE/16/3 = 174762, which take the six-step algorithm. Complex only:
-# the 1-D real transforms stop at 65536. Without FFTW they have no reference and skip.
+# 1-D lengths above L2SIZE/16/3 = 174762, at which the complex transforms take the six-step
+# algorithm. Without FFTW they have no reference and skip.
 SIZES_SIXSTEP = 196608 262144
 
+# Several plans at once. An entry of PLANS is a shape to check and a second shape: plans of
+# the second are made before and after the checked one's, and one of them is run before
+# both are destroyed (juffte_test -o). The 1-D real transforms run on the 2-D ones' code,
+# with plans of their own; "100 96x100" puts one next to the other. The THREADS sizes are
+# checked from four threads at once (juffte_test_f -p); 20x60 and 9x16x20 stay below
+# N = 4000, so that they run without FFTW too.
+PLANS = "96 100" "100 96" "96 96" "9x96 20x60" "20x60 9x96" "9x96 9x96" "96 9x96" \
+        "9x16x20 12x18x20" "12x18x20 9x16x20" "12x18x20 12x18x20" "9x16x20 9x96" \
+        "100 96x100" "1024 262144" "262144 196608"
+THREADS = 96 1000 65536 "20 60" "1024 729" "9 16 20" "64 64 64" 262144
+
 # Added by -DTHOROUGH_TESTS=ON or `make test THOROUGH=1`: every 2-3-5 length up to 128,
-# powers of each radix, the size caps (65536 in 1-D and 2-D, 4096 per 3-D dimension), and
-# lopsided shapes. 1-D stays at 65536 or below, the cap of the 1-D real transforms.
+# powers of each radix, lengths past the former size caps (65536 in 1-D real and 2-D, 4096
+# per 3-D dimension), and lopsided shapes.
 THOROUGH_1D = 3 4 5 6 8 10 12 15 16 18 20 24 25 27 30 32 36 40 45 48 50 54 60 64 72 75 80 81 \
               90 108 125 128 243 256 360 500 625 729 768 2048 2187 3125 4096 6561 8192 15625 \
-              16384 32768 46656 59049 65536
+              16384 32768 46656 59049 65536 131072
 THOROUGH_2D = "3 5" "5 3" "4 6" "16 9" "25 27" "64 128" "128 64" "243 32" "1000 100" \
-              "512 512" "1024 729" "2048 2" "2 2048" "65536 2" "2 65536"
+              "512 512" "1024 729" "2048 2" "2 2048" "65536 2" "2 65536" "131072 2" "2 131072"
 THOROUGH_3D = "2 3 5" "3 4 5" "5 4 3" "8 27 25" "45 32 16" "6 25 81" "100 30 8" "64 64 64" \
-              "128 128 128" "4096 2 2" "2 4096 2" "2 2 4096"
+              "128 128 128" "4096 2 2" "2 4096 2" "2 2 4096" "8192 2 2" "2 2 8192"
 THOROUGH_SIXSTEP = 390625 531441 1000000 1048576

@@ -10,7 +10,7 @@ It works like the Fortran test; see `tests/fortran/README.md` for the options, r
 error bounds. Options are parsed with `getopt`, the input comes from `drand48`.
 
 ```
-juffte_test_c [-t complex|real] [-d fw|bw] [-a native|fftw] n1 [n2 [n3]]
+juffte_test_c [-t complex|real] [-d fw|bw] [-a native|fftw] [-o m1[xm2[xm3]]] n1 [n2 [n3]]
 ```
 
 The C API is FP64 only. `-a fftw` calls the FFTW compatibility layer as FFTW code would:

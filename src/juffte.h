@@ -14,7 +14,9 @@ extern "C" {
 
 #define FFTW_ALIGNMENT 32
 
-enum { juffte_init = 0, juffte_fw = -1, juffte_bw = 1 };
+// juffte_init makes the plan of a shape, or takes another reference to it; juffte_destroy
+// drops one, and the plan is freed with the last.
+enum { juffte_init = 0, juffte_fw = -1, juffte_bw = 1, juffte_destroy = 2 };
 
 // Native C API. The complex type is layout-compatible with fftw_complex below.
 // Dimensions are given contiguous first: in zfft2d_c(a, nx, ny, ...), nx is contiguous.

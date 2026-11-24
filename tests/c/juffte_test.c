@@ -5,11 +5,13 @@
 //
 // Checks one juFFTe transform, called from C, against a reference:
 //
-//   juffte_test_c [-t complex|real] [-d fw|bw] [-a native|fftw] n1 [n2 [n3]]
+//   juffte_test_c [-t complex|real] [-d fw|bw] [-a native|fftw] [-o m1[xm2[xm3]]] n1 [n2 [n3]]
 //
 // Defaults: complex, fw, native. The number of sizes is the dimension, n1 is
 // contiguous. "-t real -d fw" is r2c, "-t real -d bw" c2r. "-a fftw" drives the
-// FFTW compatibility layer the way FFTW code would.
+// FFTW compatibility layer the way FFTW code would. "-o" makes plans of a second shape
+// before and after the plan under test, runs one and destroys both, which must not
+// disturb it.
 //
 // Every variant of the transform (in place, out of place, ...) runs on the same
 // random input and is compared with the reference: FFTW when built with
@@ -42,6 +44,17 @@ static size_t N;               // n1 * n2 * n3
 static size_t NH;              // (n1/2 + 1) * n2 * n3, the half spectrum of a real transform
 static size_t in_len, out_len; // of the transform under test, in doubles
 static int failures;
+
+// The shape of -o; swap_shape() exchanges it with the one above.
+static int o_rank, o_n[3] = {1, 1, 1};
+
+static void set_lengths(void)
+{
+    N = (size_t) n[0] * n[1] * n[2];
+    NH = N / n[0] * (n[0] / 2 + 1);
+    in_len = is_complex ? 2 * N : dir == juffte_fw ? N : 2 * NH;
+    out_len = is_complex ? 2 * N : dir == juffte_fw ? 2 * NH : N;
+}
 
 // Complex data is held as pairs of doubles. All buffers come from the library's
 // aligned allocator, juffte_fftw_malloc.
@@ -313,34 +326,59 @@ static void c2r(double *in, double *out, int iopt)
 // The FFTW layer as FFTW code would call it: dimensions slowest first, one plan.
 // fftw_execute works on the arrays the plan was made with, so the data is staged
 // through them.
-static juffte_fftw_plan plan;
-static double *plan_in, *plan_out;
+struct api_plan {
+    juffte_fftw_plan plan;
+    double *in, *out;
+};
+static struct api_plan api;
+
+// fftw_execute through a plan made out of place, or in place.
+static void api_run(double *in, double *out, int iopt, int in_place)
+{
+    if (iopt == juffte_destroy) {
+        juffte_fftw_destroy_plan(api.plan);
+        if (api.out != api.in)
+            juffte_fftw_free(api.out);
+        juffte_fftw_free(api.in);
+        return;
+    }
+    if (iopt == juffte_init) {
+        api.in = juffte_fftw_malloc((in_len > out_len ? in_len : out_len) * sizeof *api.in);
+        api.out = in_place ? api.in : juffte_fftw_malloc(out_len * sizeof *api.out);
+        juffte_fftw_complex *i = (juffte_fftw_complex *) api.in;
+        juffte_fftw_complex *o = (juffte_fftw_complex *) api.out;
+        if (rank == 1)
+            api.plan = juffte_fftw_plan_dft_1d(n[0], i, o, dir, FFTW_ESTIMATE);
+        else if (rank == 2)
+            api.plan = juffte_fftw_plan_dft_2d(n[1], n[0], i, o, dir, FFTW_ESTIMATE);
+        else
+            api.plan = juffte_fftw_plan_dft_3d(n[2], n[1], n[0], i, o, dir, FFTW_ESTIMATE);
+        return;
+    }
+    memcpy(api.in, in, in_len * sizeof *in);
+    juffte_fftw_execute(api.plan);
+    if (in_place) {
+        memcpy(in, api.in, out_len * sizeof *out);
+        return;
+    }
+    memcpy(in, api.in, in_len * sizeof *in);
+    memcpy(out, api.out, out_len * sizeof *out);
+}
 
 static void api_execute(double *in, double *out, int iopt)
 {
-    if (iopt == juffte_init) {
-        plan_in = juffte_fftw_malloc(in_len * sizeof *plan_in);
-        plan_out = juffte_fftw_malloc(out_len * sizeof *plan_out);
-        juffte_fftw_complex *i = (juffte_fftw_complex *) plan_in;
-        juffte_fftw_complex *o = (juffte_fftw_complex *) plan_out;
-        if (rank == 1)
-            plan = juffte_fftw_plan_dft_1d(n[0], i, o, dir, FFTW_ESTIMATE);
-        else if (rank == 2)
-            plan = juffte_fftw_plan_dft_2d(n[1], n[0], i, o, dir, FFTW_ESTIMATE);
-        else
-            plan = juffte_fftw_plan_dft_3d(n[2], n[1], n[0], i, o, dir, FFTW_ESTIMATE);
-        return;
-    }
-    memcpy(plan_in, in, in_len * sizeof *in);
-    juffte_fftw_execute(plan);
-    memcpy(in, plan_in, in_len * sizeof *in);
-    memcpy(out, plan_out, out_len * sizeof *out);
+    api_run(in, out, iopt, 0);
+}
+
+static void api_execute_in_place(double *in, double *out, int iopt)
+{
+    api_run(in, out, iopt, 1);
 }
 
 static void api_execute_dft(double *in, double *out, int iopt)
 {
     (void) iopt; // the plan's direction
-    juffte_fftw_execute_dft(plan, (juffte_fftw_complex *) in, (juffte_fftw_complex *) out);
+    juffte_fftw_execute_dft(api.plan, (juffte_fftw_complex *) in, (juffte_fftw_complex *) out);
 }
 
 static const struct variant c2c_variants[] = {
@@ -352,7 +390,38 @@ static const struct variant c2r_variants[] = {{"c2r", c2r, .init = 1}};
 static const struct variant fftw_api_variants[] = {
     {"fftw_execute", api_execute, .init = 1, .keeps_input = 1},
     {"fftw_execute_dft", api_execute_dft, .keeps_input = 1},
+    {"fftw_execute in place", api_execute_in_place, .init = 1, .in_place = 1},
 };
+
+#define SWAP(T, a, b) do { T t_ = (a); (a) = (b); (b) = t_; } while (0)
+
+// The shape under test and its FFTW plan for the shape of -o and its plan number k, and
+// back.
+static void swap_shape(int k)
+{
+    static struct api_plan o_api[2];
+
+    SWAP(int, rank, o_rank);
+    for (int d = 0; d < 3; d++)
+        SWAP(int, n[d], o_n[d]);
+    SWAP(struct api_plan, api, o_api[k]);
+    set_lengths();
+}
+
+// With -o: calls the transform the way v does at the other shape, with the count values
+// of iopt in turn, through plan number k of that shape.
+static void other_plan(const struct variant *v, int k, const int *iopt, int count)
+{
+    swap_shape(k);
+    double *in = juffte_fftw_malloc(in_len * sizeof *in);
+    double *out = juffte_fftw_malloc(out_len * sizeof *out);
+    for (size_t i = 0; i < in_len; i++)
+        in[i] = 1.0;
+    for (int i = 0; i < count; i++)
+        v->run(in, out, iopt[i]);
+    juffte_fftw_free(in), juffte_fftw_free(out);
+    swap_shape(k);
+}
 
 // Runs every variant on the same input and compares it with the reference.
 static void run_variants(const struct variant *v, size_t count)
@@ -366,8 +435,14 @@ static void run_variants(const struct variant *v, size_t count)
     reference(x, ref);
     for (size_t i = 0; i < count; i++) {
         if (v[i].init) {
+            if (o_rank)
+                other_plan(&v[i], 0, (int[]){juffte_init}, 1);
             memcpy(in, x, in_len * sizeof *in);
             v[i].run(in, out, juffte_init);
+            if (o_rank) {
+                other_plan(&v[i], 1, (int[]){juffte_init, dir, juffte_destroy}, 3);
+                other_plan(&v[i], 0, (int[]){juffte_destroy}, 1);
+            }
         }
         memcpy(in, x, in_len * sizeof *in);
         memset(out, 0, out_len * sizeof *out);
@@ -385,21 +460,49 @@ static void run_variants(const struct variant *v, size_t count)
 
 static int usage(const char *exe)
 {
-    fprintf(stderr, "usage: %s [-t complex|real] [-d fw|bw] [-a native|fftw] n1 [n2 [n3]]\n", exe);
+    fprintf(stderr, "usage: %s [-t complex|real] [-d fw|bw] [-a native|fftw] [-o m1[xm2[xm3]]] "
+                    "n1 [n2 [n3]]\n", exe);
     return 2;
+}
+
+// The length at the start of s, 1 to 2^30, or 0 if there is none; *end is what follows.
+static int read_size(const char *s, char **end)
+{
+    long v = strtol(s, end, 10);
+    return (*end != s && v >= 1 && v <= 1 << 30) ? (int) v : 0;
 }
 
 static int parse_size(const char *s)
 {
     char *end;
-    long v = strtol(s, &end, 10);
-    return (*end == '\0' && v >= 1 && v <= 1 << 30) ? (int) v : 0;
+    int v = read_size(s, &end);
+    return *end == '\0' ? v : 0;
+}
+
+// m1[xm2[xm3]], the shape of -o; returns its rank, or 0 if it is not one.
+static int parse_shape(const char *s, int *m)
+{
+    char *end;
+    for (int r = 1; r <= 3; r++, s = end + 1) {
+        if (!(m[r - 1] = read_size(s, &end)))
+            return 0;
+        if (*end != 'x')
+            return *end == '\0' ? r : 0;
+    }
+    return 0;
+}
+
+static void print_shape(const int *m, int r)
+{
+    printf("%d", m[0]);
+    for (int d = 1; d < r; d++)
+        printf("x%d", m[d]);
 }
 
 int main(int argc, char **argv)
 {
     int opt;
-    while ((opt = getopt(argc, argv, "t:d:a:")) != -1) {
+    while ((opt = getopt(argc, argv, "t:d:a:o:")) != -1) {
         if (opt == 't' && strcmp(optarg, "complex") == 0)
             is_complex = 1;
         else if (opt == 't' && strcmp(optarg, "real") == 0)
@@ -412,6 +515,8 @@ int main(int argc, char **argv)
             fftw_api = 0;
         else if (opt == 'a' && strcmp(optarg, "fftw") == 0)
             fftw_api = 1;
+        else if (opt == 'o' && (o_rank = parse_shape(optarg, o_n)))
+            ;
         else
             return usage(argv[0]);
     }
@@ -419,25 +524,24 @@ int main(int argc, char **argv)
     rank = argc - optind;
     if (rank < 1 || rank > 3)
         return usage(argv[0]);
-    N = 1;
-    for (int d = 0; d < rank; d++) {
+    for (int d = 0; d < rank; d++)
         if (!(n[d] = parse_size(argv[optind + d])))
             return usage(argv[0]);
-        N *= n[d];
-    }
-    NH = N / n[0] * (n[0] / 2 + 1);
     if (fftw_api && !is_complex) {
         fprintf(stderr, "The FFTW compatibility layer has no real transforms.\n");
         return 2;
     }
-    in_len = is_complex ? 2 * N : dir == juffte_fw ? N : 2 * NH;
-    out_len = is_complex ? 2 * N : dir == juffte_fw ? 2 * NH : N;
+    set_lengths();
 
-    printf("%s %s %d", is_complex ? "complex" : "real", dir == juffte_fw ? "fw" : "bw", n[0]);
-    for (int d = 1; d < rank; d++)
-        printf("x%d", n[d]);
+    printf("%s %s ", is_complex ? "complex" : "real", dir == juffte_fw ? "fw" : "bw");
+    print_shape(n, rank);
     printf(", %s API, reference: %s\n", fftw_api ? "FFTW" : "native",
            have_reference() ? reference_name() : "none");
+    if (o_rank) {
+        printf("with a second plan of ");
+        print_shape(o_n, o_rank);
+        printf("\n");
+    }
     if (!have_reference()) {
         puts("SKIP: no reference at this size");
         return 77;
