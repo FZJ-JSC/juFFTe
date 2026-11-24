@@ -4,67 +4,79 @@
 ! --------------------------------------------------------------------------------------------------
 
 module fftw_m
-use, intrinsic :: iso_fortran_env
-use, intrinsic :: iso_fortran_env
 use, intrinsic :: iso_c_binding
 use omp_lib
-use bench_utils_m
     implicit none
-    integer :: nthreads, err
-type(C_PTR) :: plan
     include 'fftw3.f03'
 
 private
-public  :: fftw_warmup, fftw_bench
+public :: fftw_bench_plan, fftw_bench_run, fftw_bench_destroy
+
+type(c_ptr) :: plan = c_null_ptr
+! The planned arrays, for the execute calls (fftw3.f03 has no plain fftw_execute).
+character(len=3) :: plan_type
+complex(c_double_complex), pointer, contiguous :: c_in(:), c_out(:)
+real(c_double), pointer, contiguous :: r(:)
 
 contains
 
-subroutine fftw_warmup(n,dim,in,out)
+! Plans FFTW's counterpart of the juFFTe transform on the same arrays: c2c on a, in place or
+! into b; r2c from a_r into a; c2r from a into a_r. FFTW is row-major, so the dimensions go
+! in reversed. Planning other than with estimate overwrites the arrays.
+subroutine fftw_bench_plan(fft_type, direction, placement, n, planner, wisdom, a, b, a_r)
 
-integer, intent (in)      :: n(3), dim
-complex(real64), intent(inout) :: in(:), out(:)
+character(len=*), intent(in)   :: fft_type, direction, placement, planner, wisdom
+integer, intent(in)            :: n(:)
+complex(c_double_complex), contiguous, target, intent(inout) :: a(:), b(:)
+real(c_double), contiguous, target, intent(inout)            :: a_r(:)
+integer(c_int) :: rank, dims(3), sign, flags, ok
 
-nthreads = omp_get_max_threads()
+if (fftw_init_threads() == 0) error stop "fftw_init_threads failed"
+call fftw_plan_with_nthreads(omp_get_max_threads())
 
-err = fftw_init_threads()
-call fftw_plan_with_nthreads(nthreads)
+select case (planner)
+case ("estimate"); flags = FFTW_ESTIMATE
+case ("patient");  flags = FFTW_PATIENT
+case default;      flags = FFTW_MEASURE
+end select
+if (len_trim(wisdom) > 0) ok = fftw_import_wisdom_from_filename(trim(wisdom) // c_null_char)
 
-if (dim == 1) then
-    call init(in, n(1))
-    plan = fftw_plan_dft_1d(n(1), in, out, FFTW_FORWARD, FFTW_ESTIMATE)
-else if (dim == 2) then
-    call init(in, n(1)*n(2))
-    plan = fftw_plan_dft_2d(n(1),n(2), in, out, FFTW_FORWARD, FFTW_ESTIMATE)
-else
-    call init(in, n(1)*n(2)*n(3))
-    plan = fftw_plan_dft_3d(n(1),n(2),n(3), in, out, FFTW_FORWARD, FFTW_ESTIMATE)
-endif
-call fftw_execute_dft(plan, in, out)
-end subroutine fftw_warmup
+rank = size(n)
+dims(1:rank) = int(n(rank:1:-1), c_int)
+plan_type = fft_type
+select case (fft_type)
+case ("r2c")
+    r => a_r
+    c_out => a
+    plan = fftw_plan_dft_r2c(rank, dims, r, c_out, flags)
+case ("c2r")
+    c_in => a
+    r => a_r
+    plan = fftw_plan_dft_c2r(rank, dims, c_in, r, flags)
+case default
+    sign = FFTW_FORWARD
+    if (direction == "bw") sign = FFTW_BACKWARD
+    c_in => a
+    c_out => a
+    if (placement == "out") c_out => b
+    plan = fftw_plan_dft(rank, dims, c_in, c_out, sign, flags)
+end select
+if (.not. c_associated(plan)) error stop "FFTW could not plan the transform"
 
-subroutine fftw_bench(n,dim,in,out,time0)
+if (len_trim(wisdom) > 0) ok = fftw_export_wisdom_to_filename(trim(wisdom) // c_null_char)
+end subroutine fftw_bench_plan
 
-integer, intent (in)      :: n(3), dim
-complex(real64), intent(inout) :: in(:), out(:)
-real(real64), intent(out) :: time0
-real(real64)              :: time1, time2
-integer              :: loop = 1 ,i
+subroutine fftw_bench_run()
+select case (plan_type)
+case ("r2c"); call fftw_execute_dft_r2c(plan, r, c_out)
+case ("c2r"); call fftw_execute_dft_c2r(plan, c_in, r)
+case default; call fftw_execute_dft(plan, c_in, c_out)
+end select
+end subroutine fftw_bench_run
 
-do
-    time1 = omp_get_wtime()
-    do i = 1, loop
-        call fftw_execute_dft(plan, in, out)
-    end do
-    time2 = omp_get_wtime()
-    time0 = time2 - time1
-    if (time0 >= 1.0d0) then   ! to make sure the benchmarking takes at least 1s
-        exit
-    end if
-    loop = loop*2
-end do
-time0 = time0/dble(loop)
-
-end subroutine fftw_bench
-
+subroutine fftw_bench_destroy()
+call fftw_destroy_plan(plan)
+call fftw_cleanup_threads()
+end subroutine fftw_bench_destroy
 
 end module fftw_m
